@@ -26,15 +26,14 @@ jobs:
         run: |
           rustup toolchain install 1.92.0 --profile minimal --component rustfmt,clippy
           rustup default 1.92.0
+      # ONNX Runtime (ort-sys) is unpacked outside target/ and the cached build script links
+      # from there, so it must live in the same cache entry as target/. OCR models are re-fetched
+      # by build.rs when missing; macOS keeps them under a path with a space, not cached.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      # ONNX Runtime (ort-sys) and OCR models are downloaded outside target/; the cached build
-      # scripts point at them, so they are cached under the same key.
-      - uses: actions/cache@v6
         with:
-          path: |
+          cache-directories: |
             ~/.cache/ort.pyke.io
             ~/.local/share/plaindoc/models
-          key: downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'crates/ocr/model-manifest.txt') }}
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-features --all-targets --locked -- -D warnings
       - run: scripts/check-file-size.sh
@@ -63,14 +62,11 @@ jobs:
           rustup toolchain install 1.92.0 --profile minimal
           rustup default 1.92.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - uses: actions/cache@v6
         with:
-          path: |
+          cache-directories: |
             ~/.cache/ort.pyke.io
             ~/Library/Caches/ort.pyke.io
             ~/AppData/Local/ort.pyke.io
             ~/.local/share/plaindoc/models
-            ~/Library/Application Support/plaindoc/models
             ~/AppData/Local/plaindoc/models
-          key: downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'crates/ocr/model-manifest.txt') }}
       - run: cargo test --workspace --all-features --locked
