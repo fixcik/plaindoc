@@ -10,6 +10,18 @@ A fast document parser for LLM agents: turns office files, PDFs and scans into M
 - **OCR:** PP-OCRv5 models (about 13 MB) embedded in the binary.
 - One Rust binary, no Python and no heavy machine-learning frameworks.
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/fixcik/plaindoc/main/install.sh | bash
+```
+
+The script picks the binary for your system (macOS on Apple silicon, Linux x86_64 or aarch64),
+checks its sha256 and puts `plaindoc` into `~/.local/bin`. Set `PLAINDOC_VERSION` (for example
+`0.1.0`) to install a specific release and `PLAINDOC_INSTALL_DIR` to change the directory. To
+remove it, delete the binary. On Windows download the `.zip` from
+[GitHub Releases](https://github.com/fixcik/plaindoc/releases) and put `plaindoc.exe` on `PATH`.
+
 ## Build and run
 
 ```sh
@@ -20,9 +32,9 @@ plaindoc parse --help                        # OCR mode, hidden text, page separ
 ```
 
 Prebuilt binaries for macOS (Apple silicon), Linux (x86_64, aarch64) and Windows (x86_64), with
-the OCR models embedded: [GitHub Releases](https://github.com/fixcik/plaindoc/releases). The Linux
-binaries need glibc 2.38+ and libstdc++ from GCC 13+ (Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10
-or newer); for older systems see [docs/building.md](docs/building.md#linux-requirements).
+the OCR models embedded, are on [GitHub Releases](https://github.com/fixcik/plaindoc/releases). The
+Linux binaries need glibc 2.38+ and libstdc++ from GCC 13+ (Ubuntu 24.04, Debian 13, Fedora 39,
+RHEL 10 or newer); for older systems see [docs/building.md](docs/building.md#linux-requirements).
 
 ## Compared with Docling
 
