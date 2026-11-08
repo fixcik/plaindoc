@@ -1,8 +1,10 @@
+use crate::chunks::Chunks;
 use crate::{
     Block, Cell, Document, Format, Level, ListItem, NoteKind, Section, SectionKind, Warning,
 };
 use crate::{md_alt, md_images, md_links};
 use std::fmt::Write;
+use std::io;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -49,9 +51,35 @@ impl Document {
     }
 
     pub fn to_markdown_with(&self, opts: &MarkdownOptions) -> String {
-        let mut parts = Vec::new();
+        let mut out = Vec::new();
+        self.write_markdown_with(opts, &mut out)
+            .expect("writing to a Vec cannot fail");
+        String::from_utf8(out).expect("Markdown is UTF-8")
+    }
+
+    /// Writes the same text as [`Document::to_markdown`] into `out`; see
+    /// [`Document::write_markdown_with`] for buffering and errors.
+    pub fn write_markdown<W: io::Write + ?Sized>(&self, out: &mut W) -> io::Result<()> {
+        self.write_markdown_with(&MarkdownOptions::default(), out)
+    }
+
+    /// Writes the same text as [`Document::to_markdown_with`] into `out`, block by block: the
+    /// whole text is never held in memory, a top-level table goes out row by row. `out` gets the
+    /// text in chunks of about 64 KiB, so it needs no buffer of its own. Nothing is flushed. The
+    /// first write error is returned as is once the document is rendered; nothing after it is
+    /// written, what was written before it stays in `out`.
+    pub fn write_markdown_with<W: io::Write + ?Sized>(
+        &self,
+        opts: &MarkdownOptions,
+        out: &mut W,
+    ) -> io::Result<()> {
+        let mut chunks = Chunks::new(out);
+        let mut parts = Parts {
+            out: &mut chunks,
+            started: false,
+        };
         if opts.warnings {
-            push_warnings(&mut parts, &self.warnings);
+            push_warnings(&mut parts, &self.warnings)?;
         }
         // Markdown sources are passed through as is: their text is already Markdown
         let escape = self.metadata.format != Some(Format::Md);
@@ -59,19 +87,46 @@ impl Document {
         for s in &self.sections {
             if s.kind == SectionKind::Page {
                 if opts.page_separator == PageSeparator::Rule && !first_page {
-                    parts.push("---".to_string());
+                    parts.push("---")?;
                 }
                 first_page = false;
             }
-            render_section(&mut parts, s, opts, escape);
+            render_section(&mut parts, s, opts, escape)?;
         }
-        parts.retain(|p| !p.is_empty());
-        if parts.is_empty() {
-            return String::new();
+        parts.finish()?;
+        chunks.finish()
+    }
+}
+
+/// The output as a sequence of parts (blocks, comments, rules): empty parts are skipped, the
+/// others are joined by a blank line, and a non-empty output ends with a newline.
+struct Parts<'a, W: io::Write + ?Sized> {
+    out: &'a mut W,
+    started: bool,
+}
+
+impl<W: io::Write + ?Sized> Parts<'_, W> {
+    fn push(&mut self, part: &str) -> io::Result<()> {
+        if part.is_empty() {
+            return Ok(());
         }
-        let mut out = parts.join("\n\n");
-        out.push('\n');
-        out
+        self.begin()?.write_all(part.as_bytes())
+    }
+
+    /// Starts a part the caller writes itself; it must not be empty.
+    fn begin(&mut self) -> io::Result<&mut W> {
+        if self.started {
+            self.out.write_all(b"\n\n")?;
+        }
+        self.started = true;
+        Ok(self.out)
+    }
+
+    fn finish(self) -> io::Result<()> {
+        if self.started {
+            self.out.write_all(b"\n")?;
+        }
+        Ok(())
     }
 }
 
@@ -84,22 +139,31 @@ fn comment_text(s: &str) -> String {
     t
 }
 
-fn push_warnings(parts: &mut Vec<String>, warnings: &[Warning]) {
+fn push_warnings<W: io::Write + ?Sized>(
+    parts: &mut Parts<W>,
+    warnings: &[Warning],
+) -> io::Result<()> {
     for w in warnings {
         let lvl = match w.level {
             Level::Info => continue,
             Level::Warn => "warn",
             Level::Loss => "loss",
         };
-        parts.push(format!(
+        parts.push(&format!(
             "<!-- warning({lvl}) {:?}: {} -->",
             w.kind,
             comment_text(&w.message)
-        ));
+        ))?;
     }
+    Ok(())
 }
 
-fn render_section(parts: &mut Vec<String>, s: &Section, opts: &MarkdownOptions, escape: bool) {
+fn render_section<W: io::Write + ?Sized>(
+    parts: &mut Parts<W>,
+    s: &Section,
+    opts: &MarkdownOptions,
+    escape: bool,
+) -> io::Result<()> {
     let kind = match s.kind {
         SectionKind::Page if opts.page_separator == PageSeparator::Comment => Some("page"),
         SectionKind::Page | SectionKind::Body => None,
@@ -112,10 +176,10 @@ fn render_section(parts: &mut Vec<String>, s: &Section, opts: &MarkdownOptions, 
             .as_deref()
             .map(|n| format!(": {}", comment_text(n)))
             .unwrap_or_default();
-        parts.push(format!("<!-- {kind} {}{name} -->", s.index + 1));
+        parts.push(&format!("<!-- {kind} {}{name} -->", s.index + 1))?;
     }
     if opts.warnings {
-        push_warnings(parts, &s.warnings);
+        push_warnings(parts, &s.warnings)?;
     }
     let dir = opts.image_dir.as_deref();
     let shown: Vec<&Block> = s
@@ -124,7 +188,7 @@ fn render_section(parts: &mut Vec<String>, s: &Section, opts: &MarkdownOptions, 
         .filter(|b| opts.headers_footers || !is_header_footer(b))
         .collect();
     for (i, b) in shown.iter().enumerate() {
-        parts.push(match b {
+        match b {
             Block::Image { image: Some(_), .. } => {
                 let prev = i.checked_sub(1).map(|p| shown[p]);
                 let alt = md_alt::resolve(prev, b, shown.get(i + 1).copied());
@@ -132,11 +196,20 @@ fn render_section(parts: &mut Vec<String>, s: &Section, opts: &MarkdownOptions, 
                 if let Block::Image { alt: a, .. } = &mut one {
                     *a = alt;
                 }
-                render_block(&one, escape, opts.headers_footers, dir)
+                parts.push(&render_block(&one, escape, opts.headers_footers, dir))?;
             }
-            _ => render_block(b, escape, opts.headers_footers, dir),
-        });
+            // A table can be most of the output (a sheet): written row by row, not as one string.
+            Block::Table {
+                rows, header_rows, ..
+            } => {
+                if !rows.is_empty() {
+                    write_table(parts.begin()?, rows, *header_rows, dir)?;
+                }
+            }
+            _ => parts.push(&render_block(b, escape, opts.headers_footers, dir))?,
+        }
     }
+    Ok(())
 }
 
 /// Header, footer and page-number notes: emitted only with [`MarkdownOptions::headers_footers`].
@@ -346,15 +419,32 @@ fn gfm_linked_cell(c: &Cell) -> String {
     paras.join("<br>").trim().to_string()
 }
 
+/// Text written into a `Vec` by `f` (the writers only write UTF-8).
+fn to_string(f: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -> String {
+    let mut out = Vec::new();
+    f(&mut out).expect("writing to a Vec cannot fail");
+    String::from_utf8(out).expect("Markdown is UTF-8")
+}
+
 fn render_table(rows: &[Vec<Cell>], header_rows: usize, dir: Option<&str>) -> String {
+    to_string(|out| write_table(out, rows, header_rows, dir))
+}
+
+/// A table as GFM (or HTML when GFM cannot hold it), one row at a time; nothing for no rows.
+fn write_table<W: io::Write + ?Sized>(
+    out: &mut W,
+    rows: &[Vec<Cell>],
+    header_rows: usize,
+    dir: Option<&str>,
+) -> io::Result<()> {
     if rows.is_empty() {
-        return String::new();
+        return Ok(());
     }
     if needs_html(rows, header_rows) {
-        return render_html_table(rows, header_rows, dir);
+        return write_html_table(out, rows, header_rows, dir);
     }
     let cols = rows.iter().map(Vec::len).max().unwrap_or(0).max(1);
-    let line = |cells: &[String]| format!("| {} |", cells.join(" | "));
+    let line = |out: &mut W, cells: &[String]| write!(out, "| {} |", cells.join(" | "));
     let row_text = |r: &[Cell]| -> Vec<String> {
         (0..cols)
             .map(|i| r.get(i).map(gfm_linked_cell).unwrap_or_default())
@@ -365,9 +455,14 @@ fn render_table(rows: &[Vec<Cell>], header_rows: usize, dir: Option<&str>) -> St
     } else {
         (vec![String::new(); cols], rows)
     };
-    let mut lines = vec![line(&head), line(&vec!["---".to_string(); cols])];
-    lines.extend(body.iter().map(|r| line(&row_text(r))));
-    lines.join("\n")
+    line(out, &head)?;
+    out.write_all(b"\n")?;
+    line(out, &vec!["---".to_string(); cols])?;
+    for r in body {
+        out.write_all(b"\n")?;
+        line(out, &row_text(r))?;
+    }
+    Ok(())
 }
 
 fn needs_html(rows: &[Vec<Cell>], header_rows: usize) -> bool {
@@ -392,37 +487,45 @@ fn html_escape(s: &str) -> String {
 }
 
 fn render_html_table(rows: &[Vec<Cell>], header_rows: usize, dir: Option<&str>) -> String {
+    to_string(|out| write_html_table(out, rows, header_rows, dir))
+}
+
+fn write_html_table<W: io::Write + ?Sized>(
+    out: &mut W,
+    rows: &[Vec<Cell>],
+    header_rows: usize,
+    dir: Option<&str>,
+) -> io::Result<()> {
     let header_rows = header_rows.min(rows.len());
-    let mut out = String::from("<table>\n");
+    out.write_all(b"<table>\n")?;
     for (i, row) in rows.iter().enumerate() {
         if i == 0 && header_rows > 0 {
-            out.push_str("<thead>\n");
+            out.write_all(b"<thead>\n")?;
         }
         if i == header_rows {
-            out.push_str("<tbody>\n");
+            out.write_all(b"<tbody>\n")?;
         }
-        out.push_str("<tr>");
+        out.write_all(b"<tr>")?;
         let tag = if i < header_rows { "th" } else { "td" };
         for c in row {
-            let _ = write!(out, "<{tag}");
+            write!(out, "<{tag}")?;
             if c.colspan > 1 {
-                let _ = write!(out, " colspan=\"{}\"", c.colspan);
+                write!(out, " colspan=\"{}\"", c.colspan)?;
             }
             if c.rowspan > 1 {
-                let _ = write!(out, " rowspan=\"{}\"", c.rowspan);
+                write!(out, " rowspan=\"{}\"", c.rowspan)?;
             }
-            let _ = write!(out, ">{}</{tag}>", html_inline_blocks(&c.blocks, dir));
+            write!(out, ">{}</{tag}>", html_inline_blocks(&c.blocks, dir))?;
         }
-        out.push_str("</tr>\n");
+        out.write_all(b"</tr>\n")?;
         if i + 1 == header_rows {
-            out.push_str("</thead>\n");
+            out.write_all(b"</thead>\n")?;
         }
     }
     if rows.len() > header_rows {
-        out.push_str("</tbody>\n");
+        out.write_all(b"</tbody>\n")?;
     }
-    out.push_str("</table>");
-    out
+    out.write_all(b"</table>")
 }
 
 fn html_block(b: &Block, dir: Option<&str>) -> String {
