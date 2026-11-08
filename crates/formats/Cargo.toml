@@ -116,6 +116,10 @@ required-features = ["ocr-paddle"]
 name = "ocr_eval"
 required-features = ["ocr-paddle"]
 
+[[test]]
+name = "ocr_orient_eval"
+required-features = ["ocr-paddle"]
+
 [[bench]]
 name = "ocr"
 harness = false

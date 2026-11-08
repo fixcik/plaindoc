@@ -313,33 +313,6 @@ fn skewed_page_keeps_line_order() {
     );
 }
 
-/// Box whose first edge runs bottom-to-top (text along y): `is_vertical()` (`from_aabb` is always horizontal).
-fn vbox(x0: f32, y0: f32, x1: f32, y1: f32) -> TextBox {
-    TextBox {
-        quad: [[x0, y1], [x0, y0], [x1, y0], [x1, y1]],
-        score: 0.9,
-    }
-}
-
-/// Five vertical boxes; reading confidence `hit` when the marker is at the top-left of the variant, else `miss`.
-struct Spines {
-    hit: f32,
-    miss: f32,
-}
-impl OcrEngine for Spines {
-    fn detect(&self, _img: &Image) -> Result<Vec<TextBox>, OcrError> {
-        Ok((0..5)
-            .map(|i| vbox(50.0 + 60.0 * i as f32, 50.0, 80.0 + 60.0 * i as f32, 450.0))
-            .collect())
-    }
-    fn recognize(&self, img: &Image, b: &[TextBox]) -> Result<Vec<Recognized>, OcrError> {
-        let up = img.get_pixel(5, 5)[0] < 128;
-        Ok(b.iter()
-            .map(|_| scripted_recognition("корешок", if up { self.hit } else { self.miss }))
-            .collect())
-    }
-}
-
 fn marked(w: u32, h: u32, at: (u32, u32)) -> Image {
     let mut img = Image::from_pixel(w, h, image::Rgb([255; 3]));
     for y in at.1..at.1 + 10 {
@@ -348,41 +321,6 @@ fn marked(w: u32, h: u32, at: (u32, u32)) -> Image {
         }
     }
     img
-}
-
-#[test]
-fn vertical_text_on_an_upright_page_is_not_rotated() {
-    // ≥ 60 % vertical boxes (axis labels / spines) but 0° reads best: keep 0° (I9).
-    let params = no_blank_no_deskew();
-    let e = Spines {
-        hit: 0.9,
-        miss: 0.85,
-    };
-    let img = marked(900, 500, (0, 0));
-    assert!(
-        e.detect(&img).unwrap().iter().all(TextBox::is_vertical),
-        "the 90/270 branch is exercised"
-    );
-    assert_eq!(ocr_image(&e, &img, &params).unwrap().rotation, 0);
-}
-
-#[test]
-fn page_turned_by_90_is_rotated_when_90_wins_by_the_margin() {
-    // Portrait raster with the marker bottom-left: imageops::rotate90 (clockwise) brings it to the top-left.
-    let params = no_blank_no_deskew();
-    let e = Spines {
-        hit: 0.95,
-        miss: 0.6,
-    };
-    let p = ocr_image(&e, &marked(500, 900, (0, 890)), &params).unwrap();
-    assert_eq!(p.rotation, 90);
-    assert!(p.mean_conf > 0.9);
-    assert_eq!(
-        (p.width, p.height),
-        (900, 500),
-        "boxes live in the turned raster"
-    );
-    assert_eq!((p.frame.src_w, p.frame.src_h), (500, 900));
 }
 
 #[test]
@@ -395,33 +333,33 @@ fn to_source_inverts_the_real_alignment() {
     for skew in [-1.5f32, 0.0, 1.5] {
         let deskewed = raster::rotate(&src, skew, [255; 3]);
         for rotation in [0u32, 90, 180, 270] {
-            let aligned = match rotation {
-                90 => image::imageops::rotate90(&deskewed),
-                180 => image::imageops::rotate180(&deskewed),
-                270 => image::imageops::rotate270(&deskewed),
-                _ => deskewed.clone(),
-            };
-            let ink: Vec<(f32, f32)> = aligned
-                .enumerate_pixels()
-                .filter(|p| p.2[0] < 128)
-                .map(|(x, y, _)| (x as f32 + 0.5, y as f32 + 0.5))
-                .collect();
-            let n = ink.len() as f32;
-            let (cx, cy) = ink
-                .iter()
-                .fold((0.0, 0.0), |a, p| (a.0 + p.0 / n, a.1 + p.1 / n));
-            let frame = AlignFrame {
-                rotation,
-                skew_deg: skew,
-                src_w: w,
-                src_h: h,
-            };
-            let r = frame.to_source([cx, cy, cx, cy]);
-            let back = ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0);
-            assert!(
-                (back.0 - dot.0).abs() < 1.0 && (back.1 - dot.1).abs() < 1.0,
-                "skew {skew} rotation {rotation}: {back:?} vs {dot:?}"
-            );
+            // Both orders the pipeline uses: skew then turn (180°), turn then skew (90/270°).
+            for aligned in [
+                orient::turn(&deskewed, rotation),
+                raster::rotate(&orient::turn(&src, rotation), skew, [255; 3]),
+            ] {
+                let ink: Vec<(f32, f32)> = aligned
+                    .enumerate_pixels()
+                    .filter(|p| p.2[0] < 128)
+                    .map(|(x, y, _)| (x as f32 + 0.5, y as f32 + 0.5))
+                    .collect();
+                let n = ink.len() as f32;
+                let (cx, cy) = ink
+                    .iter()
+                    .fold((0.0, 0.0), |a, p| (a.0 + p.0 / n, a.1 + p.1 / n));
+                let frame = AlignFrame {
+                    rotation,
+                    skew_deg: skew,
+                    src_w: w,
+                    src_h: h,
+                };
+                let r = frame.to_source([cx, cy, cx, cy]);
+                let back = ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0);
+                assert!(
+                    (back.0 - dot.0).abs() < 1.0 && (back.1 - dot.1).abs() < 1.0,
+                    "skew {skew} rotation {rotation}: {back:?} vs {dot:?}"
+                );
+            }
         }
     }
 }
@@ -524,7 +462,7 @@ impl OcrEngine for TurnSpy {
     fn recognize(&self, img: &Image, b: &[TextBox]) -> Result<Vec<Recognized>, OcrError> {
         let up = img.get_pixel(5, 5)[0] < 128;
         Ok(b.iter()
-            .map(|_| scripted_recognition("текст", if up { 0.95 } else { 0.4 }))
+            .map(|_| scripted_recognition("текст на странице", if up { 0.95 } else { 0.4 }))
             .collect())
     }
 }

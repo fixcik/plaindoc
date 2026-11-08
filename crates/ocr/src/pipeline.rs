@@ -1,14 +1,13 @@
-//! Engine-agnostic page OCR: blank rule -> deskew -> det -> orientation -> rec -> words -> reading order
-//! -> fixes.
+//! Engine-agnostic page OCR: blank rule -> deskew -> det -> 90/270° check -> rec -> 180° check (unsure pages
+//! only) -> words -> reading order -> fixes.
 
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
-use image::imageops;
-
 use crate::layout::{LayoutParams, Rect, lines_in_block, xy_cut};
 use crate::lines::{LinesParams, Segment, extract_lines};
+use crate::orient;
 use crate::words::{InkMap, split_words};
 use crate::{
     Image, OcrEngine, OcrError, OcrLine, OcrPage, OcrWord, Recognized, TextBox, blank, fix, raster,
@@ -36,7 +35,8 @@ pub struct OcrParams {
     pub max_boxes: usize,
     /// Estimate the skew and work on the deskewed raster (applied from `MIN_SKEW_DEG`).
     pub deskew: bool,
-    /// Orientation check: 180° on horizontal pages, 90/270° on mostly vertical ones (`OcrPage.rotation`).
+    /// Orientation check (`orient.rs`): 90/270° on mostly vertical pages, 180° on pages read unsure at 0°
+    /// (`OcrPage.rotation`).
     pub orientation: bool,
     /// Keep the aligned gray raster in `OcrPage.aligned_gray` (raster lines, task 22).
     pub keep_aligned: bool,
@@ -55,12 +55,6 @@ pub const REC_CHUNK: usize = 16;
 const R12_DET_MAX_SIDE: u32 = 1760;
 /// Smaller skew estimates are not applied.
 const MIN_SKEW_DEG: f32 = 0.25;
-/// Boxes read per orientation variant (the widest ones).
-const ORIENT_PROBES: usize = 5;
-/// A turned variant must read better by at least this confidence.
-const ORIENT_MARGIN: f32 = 0.1;
-/// Share of box area that makes a page "vertical" (90/270° candidates).
-const VERTICAL_SHARE: f32 = 0.6;
 
 impl Default for OcrParams {
     fn default() -> Self {
@@ -79,98 +73,6 @@ impl Default for OcrParams {
             table_lines: None,
         }
     }
-}
-
-/// The `ORIENT_PROBES` boxes with the longest text edge (ties by index).
-fn widest(boxes: &[TextBox]) -> Vec<TextBox> {
-    let mut idx: Vec<usize> = (0..boxes.len()).collect();
-    idx.sort_by(|&a, &b| {
-        boxes[b]
-            .extent()
-            .0
-            .total_cmp(&boxes[a].extent().0)
-            .then(a.cmp(&b))
-    });
-    idx.into_iter()
-        .take(ORIENT_PROBES)
-        .map(|i| boxes[i])
-        .collect()
-}
-
-fn mean_conf(r: &[Recognized]) -> f32 {
-    if r.is_empty() {
-        0.0
-    } else {
-        r.iter().map(|r| r.conf).sum::<f32>() / r.len() as f32
-    }
-}
-
-/// `b` in an image of `w×h` turned by 180°, corners reordered so the text still starts at `quad[0]`.
-fn turn180(b: &TextBox, w: f32, h: f32) -> TextBox {
-    let m = |[x, y]: [f32; 2]| [w - x, h - y];
-    let q = b.quad;
-    TextBox {
-        quad: [m(q[2]), m(q[3]), m(q[0]), m(q[1])],
-        score: b.score,
-    }
-}
-
-/// Orientation check on the (deskewed) page `img` with its detector `boxes`. Returns the clockwise turn
-/// (90/180/270), the turned raster and its boxes when a turn reads clearly better than 0° (I9), else `None`.
-/// At most 3 det and 3 rec calls of `ORIENT_PROBES` boxes.
-fn orient(
-    engine: &dyn OcrEngine,
-    img: &Image,
-    boxes: &[TextBox],
-) -> Result<Option<(u32, Image, Vec<TextBox>)>, OcrError> {
-    let area = |b: &TextBox| {
-        let (l, t) = b.extent();
-        l * t
-    };
-    let total: f32 = boxes.iter().map(area).sum();
-    let vertical: f32 = boxes.iter().filter(|b| b.is_vertical()).map(area).sum();
-    let probes = widest(boxes);
-    let base = engine.recognize(img, &probes)?;
-    if total > 0.0 && vertical >= VERTICAL_SHARE * total {
-        // Mostly vertical text: 0° (vertical boxes are read both ways by the engine) vs 90° and 270°.
-        let base = mean_conf(&base);
-        let turn = |rotation| {
-            if rotation == 90 {
-                imageops::rotate90(img)
-            } else {
-                imageops::rotate270(img)
-            }
-        };
-        // Only the winner's boxes are kept; its raster is rebuilt at the end (caps the peak at 3 rasters).
-        let mut best: Option<(f32, u32, Vec<TextBox>)> = None;
-        for rotation in [90, 270] {
-            let turned = turn(rotation);
-            let b = engine.detect(&turned)?;
-            if b.is_empty() {
-                continue;
-            }
-            let conf = mean_conf(&engine.recognize(&turned, &widest(&b))?);
-            if conf >= base + ORIENT_MARGIN && best.as_ref().is_none_or(|x| conf > x.0) {
-                best = Some((conf, rotation, b));
-            }
-        }
-        return Ok(best.map(|(_, r, b)| (r, turn(r), b)));
-    }
-    // Horizontal text: the same boxes read upside down; 180° needs a clear win on at least 3 of 5 probes.
-    let turned = imageops::rotate180(img);
-    let (w, h) = (img.width() as f32, img.height() as f32);
-    let mirrored: Vec<TextBox> = probes.iter().map(|b| turn180(b, w, h)).collect();
-    let flipped = engine.recognize(&turned, &mirrored)?;
-    let wins = base
-        .iter()
-        .zip(&flipped)
-        .filter(|(a, f)| f.conf >= a.conf + ORIENT_MARGIN)
-        .count();
-    if wins * ORIENT_PROBES >= 3 * probes.len() {
-        let b = engine.detect(&turned)?;
-        return Ok(Some((180, turned, b)));
-    }
-    Ok(None)
 }
 
 /// Ruling lines of the aligned raster `img` and the R-12 verdict (high-resolution det wanted).
@@ -205,6 +107,55 @@ fn ink_map(g: &image::GrayImage, ratio: f32) -> Vec<u8> {
         .unwrap_or(255) as f32;
     let thr = bg * ratio;
     g.pixels().map(|p| u8::from((p[0] as f32) < thr)).collect()
+}
+
+/// Ruling lines of the turned raster `img`; a ruled-table page is detected again at full resolution.
+fn retable(
+    engine: &dyn OcrEngine,
+    img: &Image,
+    p: &OcrParams,
+    page: &mut OcrPage,
+    boxes: &mut Vec<TextBox>,
+    stopped: &dyn Fn() -> bool,
+) -> Result<(), OcrError> {
+    if let Some(lp) = &p.table_lines {
+        (page.segments, page.full_res_det) = table_lines(img, lp);
+        if page.full_res_det && !stopped() {
+            *boxes = engine.detect_at(img, R12_DET_MAX_SIDE)?;
+        }
+    }
+    Ok(())
+}
+
+/// Recognises `boxes` (capped at `max_boxes`) in chunks, stopping between chunks when `stopped`.
+fn read(
+    engine: &dyn OcrEngine,
+    img: &Image,
+    boxes: &mut Vec<TextBox>,
+    p: &OcrParams,
+    page: &mut OcrPage,
+    stopped: &dyn Fn() -> bool,
+) -> Result<Vec<Recognized>, OcrError> {
+    page.boxes_dropped = boxes.len().saturating_sub(p.max_boxes);
+    boxes.truncate(p.max_boxes);
+    page.timed_out = false;
+    let mut recs = Vec::with_capacity(boxes.len());
+    for chunk in boxes.chunks(REC_CHUNK) {
+        if stopped() {
+            page.timed_out = true;
+            break;
+        }
+        let r = engine.recognize(img, chunk)?;
+        if r.len() != chunk.len() {
+            return Err(OcrError::Engine(format!(
+                "recognizer returned {} result(s) for {} box(es)",
+                r.len(),
+                chunk.len()
+            )));
+        }
+        recs.extend(r);
+    }
+    Ok(recs)
 }
 
 /// OCRs one image. Words and lines are in reading order with pixel boxes.
@@ -253,19 +204,43 @@ pub fn ocr_image_cancellable(
         engine.detect(&work)?
     };
     if p.orientation
-        && !boxes.is_empty()
         && !stopped()
-        && let Some((rotation, turned, turned_boxes)) = orient(engine, &work, &boxes)?
+        && let Some(rotation) = orient::sideways(engine, &work, &boxes)?
     {
-        work = Cow::Owned(turned);
-        boxes = turned_boxes;
-        page.rotation = rotation;
-        if let Some(lp) = &p.table_lines {
-            (page.segments, page.full_res_det) = table_lines(&work, lp);
-            if page.full_res_det && !stopped() {
-                boxes = engine.detect_at(&work, R12_DET_MAX_SIDE)?;
+        // The skew estimate of a sideways raster is meaningless: estimate it again on the turned source
+        // (a turn by 90° and a rotation about the centre commute, so `AlignFrame` still holds).
+        let mut turned = orient::turn(img, rotation);
+        let mut skew = 0.0;
+        if p.deskew {
+            let a = raster::estimate_skew(&raster::gray(&turned));
+            if a.abs() >= MIN_SKEW_DEG {
+                turned = raster::rotate(&turned, a, [255; 3]);
+                skew = a;
             }
         }
+        let b = engine.detect(&turned)?;
+        if orient::area_share(&b, false) >= orient::VERTICAL_SHARE {
+            work = Cow::Owned(turned);
+            (boxes, page.rotation, page.skew_deg) = (b, rotation, skew);
+            retable(engine, &work, p, &mut page, &mut boxes, &stopped)?;
+        }
+    }
+    let mut recs = read(engine, &work, &mut boxes, p, &mut page, &stopped)?;
+    if p.orientation
+        && page.rotation == 0
+        && !page.timed_out
+        && !recs.is_empty()
+        && orient::mean_conf(&recs) < orient::UPRIGHT_CONF
+        && orient::area_share(&boxes, true) < orient::VERTICAL_SHARE
+        && !stopped()
+        && let Some(turned) = orient::upside_down(engine, &work, &boxes)?
+    {
+        // Unsure page reading clearly better upside down: read it again turned by 180°.
+        work = Cow::Owned(turned);
+        page.rotation = 180;
+        boxes = engine.detect(&work)?;
+        retable(engine, &work, p, &mut page, &mut boxes, &stopped)?;
+        recs = read(engine, &work, &mut boxes, p, &mut page, &stopped)?;
     }
     let img: &Image = &work;
     page.frame.rotation = page.rotation;
@@ -273,29 +248,6 @@ pub fn ocr_image_cancellable(
     (page.width, page.height) = img.dimensions();
     if p.keep_aligned {
         page.aligned_gray = Some(raster::gray(img));
-    }
-    if boxes.is_empty() {
-        return Ok(page);
-    }
-    if boxes.len() > p.max_boxes {
-        page.boxes_dropped = boxes.len() - p.max_boxes;
-        boxes.truncate(p.max_boxes);
-    }
-    let mut recs = Vec::with_capacity(boxes.len());
-    for chunk in boxes.chunks(REC_CHUNK) {
-        if stopped() {
-            page.timed_out = true;
-            break;
-        }
-        let r = engine.recognize(img, chunk)?;
-        if r.len() != chunk.len() {
-            return Err(OcrError::Engine(format!(
-                "recognizer returned {} result(s) for {} box(es)",
-                r.len(),
-                chunk.len()
-            )));
-        }
-        recs.extend(r);
     }
     let kept: Vec<_> = boxes
         .iter()

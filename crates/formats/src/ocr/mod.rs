@@ -272,10 +272,21 @@ pub(crate) fn ocr_warnings(pages: &[&OcrPage], scope: &str, low: f32) -> (Vec<Wa
         0.0
     };
     let has_text = pages.iter().any(|p| p.has_text(5, 0.8));
+    // Pages the orientation check turned (clockwise degrees), named only when there are any.
+    let turned: Vec<String> = pages
+        .iter()
+        .filter(|p| p.rotation != 0)
+        .map(|p| format!("{}°", p.rotation))
+        .collect();
+    let turned = if turned.is_empty() {
+        String::new()
+    } else {
+        format!("; turned by {}", turned.join(", "))
+    };
     let mut w = vec![Warning::new(
         WarningKind::OcrUsed,
         Level::Info,
-        format!("OCR ({scope}): {words} words, mean confidence {conf:.2}"),
+        format!("OCR ({scope}): {words} words, mean confidence {conf:.2}{turned}"),
     )];
     if !has_text {
         w.push(Warning::new(
@@ -360,6 +371,16 @@ mod tests {
             vec![(WarningKind::OcrUsed, Level::Info)]
         );
         assert!((q - 0.95).abs() < 1e-6);
+        assert!(!w[0].message.contains("turned"));
+        let turned = OcrPage {
+            rotation: 270,
+            ..page(0.95, "Договор")
+        };
+        let (w, _) = ocr_warnings(&[&turned], "full page", 0.75);
+        assert_eq!(
+            w[0].message,
+            "OCR (full page): 1 words, mean confidence 0.95; turned by 270°"
+        );
         let (w, _) = ocr_warnings(&[&page(0.85, "Договор")], "x", 0.9);
         assert!(
             w.iter()

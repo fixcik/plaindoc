@@ -7,6 +7,7 @@ pub mod fix;
 pub mod layout;
 pub mod lines;
 pub mod models;
+mod orient;
 #[cfg(feature = "paddle")]
 mod paddle;
 mod pipeline;

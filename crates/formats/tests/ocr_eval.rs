@@ -19,7 +19,7 @@ use plaindoc_formats::Registry;
 use plaindoc_formats::ocr::{ImageParser, OcrConfig, paddle_engine};
 use plaindoc_ocr::lines::{LinesParams, extract_lines};
 use plaindoc_ocr::raster::{self, normalize_bg};
-use plaindoc_ocr::{OcrEngine, OcrPage, OcrParams, ocr_image};
+use plaindoc_ocr::{OcrEngine, OcrParams, ocr_image};
 use rayon::prelude::*;
 use serde_json::Value;
 
@@ -124,12 +124,6 @@ fn parse_text_bytes(bytes: Vec<u8>, f: Format) -> String {
     pdf_common::doc_text(&d)
 }
 
-/// Page OCR of an encoded image with the default params; panics when the models are missing.
-fn ocr_png_page(bytes: &[u8]) -> OcrPage {
-    let img = image::load_from_memory(bytes).unwrap().to_rgb8();
-    ocr_image(&*engine(), &img, &OcrParams::default()).expect("OCR models must load")
-}
-
 fn render_png(pdf: Vec<u8>, page: usize, dpi: u32) -> Vec<u8> {
     use pdf_oxide::PdfDocument;
     use pdf_oxide::rendering::{PageRenderer, RenderOptions};
@@ -138,6 +132,16 @@ fn render_png(pdf: Vec<u8>, page: usize, dpi: u32) -> Vec<u8> {
         .render_page(&doc, page)
         .unwrap()
         .data
+}
+
+/// `img` turned clockwise by `turn` degrees (0, 90, 180 or 270).
+fn turned(img: &image::RgbImage, turn: u32) -> image::RgbImage {
+    match turn {
+        90 => image::imageops::rotate90(img),
+        180 => image::imageops::rotate180(img),
+        270 => image::imageops::rotate270(img),
+        _ => img.clone(),
+    }
 }
 
 fn set_dir(var: &str) -> PathBuf {
@@ -243,12 +247,29 @@ fn synthetic_scan_set_regression() {
         ("s150", 0.072),
     ];
     let dir = set_dir("OCR_EVAL_SET");
+    // OCR_EVAL_TURN=90|180|270: every page is turned clockwise before OCR; the orientation check must undo it,
+    // so the level-frame gt boxes stay valid and the CER stays within 0.01 of the upright run.
+    let turn: u32 = std::env::var("OCR_EVAL_TURN").map_or(0, |v| v.parse().unwrap());
     let rows: Vec<ScanRow> = pool().install(|| {
         meta_lines(&dir)
             .par_iter()
             .map(|m| {
                 let bytes = std::fs::read(dir.join(m["img"].as_str().unwrap())).unwrap();
-                let page = ocr_png_page(&bytes);
+                let img = image::load_from_memory(&bytes).unwrap().to_rgb8();
+                let img = turned(&img, turn);
+                let t0 = std::time::Instant::now();
+                let page = ocr_image(&*engine(), &img, &OcrParams::default())
+                    .expect("OCR models must load");
+                let ms = t0.elapsed().as_secs_f64() * 1e3;
+                if let Some(d) = std::env::var_os("OCR_EVAL_DUMP") {
+                    let stem = m["stem"].as_str().unwrap_or("x");
+                    let v = m["variant"].as_str().unwrap();
+                    std::fs::write(
+                        PathBuf::from(d).join(format!("{v}_{stem}_{turn}.txt")),
+                        format!("{page:?}\n{ms:.1} ms\n"),
+                    )
+                    .unwrap();
+                }
                 let (mut ce, mut cn, mut we, mut wn) = (0f64, 0f64, 0f64, 0f64);
                 for gt in m["gt_lines"].as_array().unwrap() {
                     let b = f32s(&gt["bbox_px"]);
@@ -309,7 +330,7 @@ fn synthetic_scan_set_regression() {
         let res: Vec<f32> = rs.iter().map(|r| r.6.abs()).collect();
         eprintln!(
             "{v}: pages {} CER {:.4} WER {:.4} over {cn} chars / {wn} words | conf min {:.3} p10 {:.3} median {:.3} | \
-             low-conf pages <0.70 {} <0.75 {} <0.80 {} <0.85 {} | residual skew mean {:.3} max {:.3} (>0.5°: {}) | rotated {}",
+             low-conf pages <0.70 {} <0.75 {} <0.80 {} <0.85 {} | residual skew mean {:.3} max {:.3} (>0.5°: {}) | rotated {} (undoing the turn {})",
             rs.len(),
             ce / cn,
             we / wn,
@@ -324,6 +345,7 @@ fn synthetic_scan_set_regression() {
             res.iter().copied().fold(0.0, f32::max),
             res.iter().filter(|&&r| r > 0.5).count(),
             rs.iter().filter(|r| r.7 != 0).count(),
+            rs.iter().filter(|r| r.7 == (360 - turn) % 360).count(),
         );
     }
     for (v, gate) in GATES {
