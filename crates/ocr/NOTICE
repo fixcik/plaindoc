@@ -1,0 +1,22 @@
+plaindoc OCR — third-party notices
+
+1. PaddleOCR PP-OCRv5 models, unmodified ONNX files (Apache-2.0, licenses/Apache-2.0.txt):
+   - PP-OCRv5_mobile_det: huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx @ e6f4fa85f00e168c862bc462aebca69eef9b3d3d
+   - cyrillic_PP-OCRv5_mobile_rec and its character dictionary (crates/ocr/assets/dict_cyrillic.txt):
+     huggingface.co/PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx @ 2cef88145434beb8afa9dd82d77d799eb1ad7b29
+   Copyright (c) PaddlePaddle Authors.
+2. ONNX Runtime 1.28.0, linked statically through the `ort` crate. Copyright (c) Microsoft Corporation, MIT.
+   Its bundled third-party components (protobuf, abseil, onnx, flatbuffers, Eigen (MPL-2.0), ...):
+   licenses/onnxruntime-ThirdPartyNotices.txt (verbatim from microsoft/onnxruntime v1.28.0).
+3. Rust crates compiled into the binary under licenses that require the notice in binary form:
+   - tiny-skia, tiny-skia-path (BSD-3-Clause): licenses/BSD-3-Clause-tiny-skia.txt
+   - alloc-no-stdlib, alloc-stdlib, brotli (BSD-3-Clause, Dropbox): licenses/BSD-3-Clause-alloc-stdlib.txt
+   - encoding_rs (WHATWG data, BSD-3-Clause): licenses/BSD-3-Clause-encoding_rs-WHATWG.txt
+   - arrayref (BSD-2-Clause): licenses/BSD-2-Clause-arrayref.txt
+   - slotmap, zlib-rs (Zlib); unicode-linebreak, zopfli, lzma-rust2 (Apache-2.0); the rest MIT or Apache-2.0
+     (full list: `cargo tree -p plaindoc-cli -e normal --format '{p} {l}'`).
+4. Build-time only, not in the binary: ring (Apache-2.0 AND ISC), untrusted, rustls-webpki, hmac-sha256 (ISC),
+   webpki-roots (CDLA-Permissive-2.0), rustls, ureq (via `ort-sys` download-binaries).
+5. Need-OCR bigram table crates/formats/data/need_ocr/bigrams.json, compiled into the binary: counted from
+   public-domain Russian texts (ru.wikisource: PD-old-70 literature, PD-RU-exempt laws) and opendataloader-bench
+   ground truth (Apache-2.0); see crates/formats/data/need_ocr/NOTICE.

@@ -1,0 +1,108 @@
+{
+ "description": {
+  "lang": "en",
+  "title": "bold",
+  "marker": "n)",
+  "cols": 1,
+  "pages": 1
+ },
+ "pages": 1,
+ "tables": 0,
+ "headings": [
+  {
+   "text": "Jane Sample",
+   "level": 1,
+   "printed": "Jane Sample"
+  },
+  {
+   "text": "Summary",
+   "level": 2,
+   "printed": "Summary"
+  },
+  {
+   "text": "Experience",
+   "level": 2,
+   "printed": "Experience"
+  },
+  {
+   "text": "Education",
+   "level": 2,
+   "printed": "Education"
+  },
+  {
+   "text": "Additional",
+   "level": 2,
+   "printed": "Additional"
+  }
+ ],
+ "list_items": [
+  {
+   "text": "Built an order tracking module and cut request handling time by a third",
+   "ordered": true,
+   "depth": 0,
+   "marker": "1)"
+  },
+  {
+   "text": "Set up build and deployment pipelines and moved the team to weekly releases",
+   "ordered": true,
+   "depth": 0,
+   "marker": "2)"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": true,
+   "depth": 0,
+   "marker": "3)"
+  },
+  {
+   "text": "Project details: project page",
+   "ordered": true,
+   "depth": 0,
+   "marker": "4)"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": true,
+   "depth": 0,
+   "marker": "1)"
+  },
+  {
+   "text": "Optimised slow database queries so that the load dropped by half",
+   "ordered": true,
+   "depth": 0,
+   "marker": "2)"
+  },
+  {
+   "text": "Wrote automated tests for the main scenarios and plugged them into CI",
+   "ordered": true,
+   "depth": 0,
+   "marker": "3)"
+  },
+  {
+   "text": "English: reading technical literature",
+   "ordered": true,
+   "depth": 0,
+   "marker": "1)"
+  },
+  {
+   "text": "Driving licence B",
+   "ordered": true,
+   "depth": 0,
+   "marker": "2)"
+  }
+ ],
+ "links": [
+  {
+   "text": "jane@example.test",
+   "url": "mailto:jane@example.test"
+  },
+  {
+   "text": "example.test/jane",
+   "url": "https://example.test/jane"
+  },
+  {
+   "text": "project page",
+   "url": "https://example.test/project"
+  }
+ ]
+}

@@ -1,0 +1,4 @@
+.worktree/
+/target
+__pycache__/
+crates/ocr/models/

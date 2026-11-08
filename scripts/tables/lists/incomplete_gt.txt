@@ -1,0 +1,9 @@
+# PT1M documents excluded from the second ("without incomplete ground truth") false-page figure.
+# Rule, frozen before the final run: abstract collections whose real tables are only partly annotated
+# (the article XML has no entry, so detections count as false tables) plus documents with more than 30 pages.
+# This list holds every such document of lists/pt1m_docs.tsv. Format: PMCID<TAB>reason.
+PMC4471334	abstract collection and > 30 pages
+PMC4601848	abstract collection
+PMC4700083	abstract collection
+PMC4664553	> 30 pages
+PMC6053194	> 30 pages

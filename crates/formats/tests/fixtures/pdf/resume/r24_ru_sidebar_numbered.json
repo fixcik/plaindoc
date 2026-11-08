@@ -1,0 +1,113 @@
+{
+ "description": {
+  "lang": "ru",
+  "title": "bold",
+  "marker": "dot",
+  "cols": 2,
+  "pages": 1,
+  "numbered": true,
+  "bookmarks": true
+ },
+ "pages": 1,
+ "tables": 0,
+ "headings": [
+  {
+   "text": "Алексей Примеров",
+   "level": 1,
+   "printed": "Алексей Примеров"
+  },
+  {
+   "text": "1. О себе",
+   "level": 2,
+   "printed": "1. О себе"
+  },
+  {
+   "text": "2. Опыт работы",
+   "level": 2,
+   "printed": "2. Опыт работы"
+  },
+  {
+   "text": "2.1 ООО «Ромашка-Тест»",
+   "level": 3,
+   "printed": "2.1 ООО «Ромашка-Тест»"
+  },
+  {
+   "text": "2.2 АО «Северный контур»",
+   "level": 3,
+   "printed": "2.2 АО «Северный контур»"
+  },
+  {
+   "text": "3. Образование",
+   "level": 2,
+   "printed": "3. Образование"
+  },
+  {
+   "text": "4. Контакты",
+   "level": 2,
+   "printed": "4. Контакты"
+  },
+  {
+   "text": "5. Навыки",
+   "level": 2,
+   "printed": "5. Навыки"
+  }
+ ],
+ "list_items": [
+  {
+   "text": "Разработал модуль учёта заказов, сократил время обработки заявки на треть",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Настроил сборку и выкладку, перевёл команду на еженедельные релизы",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Провёл обучение для новых сотрудников и подготовил регламент проверки кода",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Подробности проекта: страница проекта",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Провёл обучение для новых сотрудников и подготовил регламент проверки кода",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Оптимизировал медленные запросы к базе данных, нагрузка снизилась вдвое",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Написал автоматические тесты для основных сценариев и подключил их к конвейеру",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  }
+ ],
+ "links": [
+  {
+   "text": "страница проекта",
+   "url": "https://example.test/project"
+  },
+  {
+   "text": "alex@example.test",
+   "url": "mailto:alex@example.test"
+  },
+  {
+   "text": "example.test/alex",
+   "url": "https://example.test/alex"
+  }
+ ]
+}

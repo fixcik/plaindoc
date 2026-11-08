@@ -1,0 +1,22 @@
+Files in this directory are from Apache POI test-data (https://github.com/apache/poi/tree/trunk/test-data), licensed under the Apache License 2.0
+Source: https://raw.githubusercontent.com/apache/poi/trunk/test-data/<dir>/<name>
+
+document/
+  table-merges.doc
+  innertable.doc
+  simple-table.doc
+  Lists.doc
+  footnote.doc
+  HeaderFooterUnicode.doc
+
+spreadsheet/
+  SimpleWithFormula.xls
+
+slideshow/
+  basic_test_ppt_file.ppt
+  bullets.ppt
+  headers_footers.ppt
+  with_textbox.ppt
+  SampleShow.pptx
+  OverlappingRelations.pptx
+  SmartArt.pptx

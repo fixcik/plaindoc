@@ -1,0 +1,162 @@
+[package]
+name = "plaindoc-formats"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["text", "markup", "odf", "rtf"]
+text = ["dep:csv", "dep:encoding_rs", "dep:chardetng"]
+markup = ["text", "dep:scraper", "dep:html5ever", "dep:ego-tree", "dep:roxmltree", "dep:base64"]
+odf = ["dep:zip", "dep:roxmltree", "dep:base64"]
+rtf = ["dep:encoding_rs"]
+pdf = ["dep:pdf_oxide", "dep:serde_json", "dep:sha2", "dep:strsim", "tables"]
+tables = []
+tables-eval = ["tables", "dep:serde_json"]
+office = ["dep:office_oxide", "dep:zip", "dep:crc32fast"]
+# OCR pipeline (rendering, image decoding, need-OCR raster features); the engine is injected.
+ocr = ["pdf", "pdf_oxide/rendering", "dep:plaindoc-ocr", "dep:image", "dep:tiff", "dep:unicode-normalization"]
+# Bundled PaddleOCR engine (ONNX Runtime, static, CPU).
+ocr-paddle = ["ocr", "plaindoc-ocr/paddle"]
+# Base models compiled into the binary (+~12.9 MB).
+bundled-models = ["ocr-paddle", "plaindoc-ocr/bundled-models"]
+# Spans and events of the parsers over `tracing` (see plaindoc_core::telemetry).
+telemetry = ["plaindoc-core/telemetry"]
+
+[dependencies]
+plaindoc-core.workspace = true
+rayon.workspace = true
+csv = { workspace = true, optional = true }
+encoding_rs = { workspace = true, optional = true }
+chardetng = { workspace = true, optional = true }
+scraper = { workspace = true, optional = true }
+html5ever = { workspace = true, optional = true }
+ego-tree = { workspace = true, optional = true }
+roxmltree = { workspace = true, optional = true }
+zip = { workspace = true, optional = true }
+# Pictures inline as base64 (HTML data URIs, ODF binary data).
+base64 = { version = "0.23.1", optional = true }
+pdf_oxide = { workspace = true, optional = true }
+# Fuzzy match of PDF bookmark titles (`pdf::outline`), already locked through other crates.
+strsim = { version = "0.11.1", optional = true }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+plaindoc-ocr = { workspace = true, optional = true }
+image = { workspace = true, optional = true, features = ["png", "jpeg", "tiff", "webp", "bmp"] }
+tiff = { version = "0.11.3", optional = true }
+# NFKC for the text-layer vs OCR check (`pdf::hidden`), already locked through `pdf_oxide`.
+unicode-normalization = { version = "0.1.26", optional = true }
+office_oxide = { version = "=0.1.16", optional = true, default-features = false }
+# Paths of OOXML pictures: CRC-32 of the bytes against the zip central directory.
+crc32fast = { version = "1.5.4", optional = true }
+
+[build-dependencies]
+sha2.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+rayon.workspace = true
+tempfile.workspace = true
+zip.workspace = true
+cfb = "=0.10.0"
+criterion = "0.8"
+tracing = { workspace = true }
+# Only for `span::Current` (not re-exported by `tracing`), already locked as a `tracing` dependency.
+tracing-core = { version = "0.1.36", default-features = false, features = ["std"] }
+
+[[test]]
+name = "pdf_corpus"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_odl"
+required-features = ["pdf"]
+
+[[test]]
+name = "need_ocr_eval"
+required-features = ["ocr"]
+
+[[test]]
+name = "pdf_cross_document"
+required-features = ["pdf"]
+
+[[bench]]
+name = "pdf"
+harness = false
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_tables_eval"
+required-features = ["pdf", "tables-eval"]
+
+[[test]]
+name = "pdf_tables_oracle"
+required-features = ["pdf", "tables-eval"]
+
+[[test]]
+name = "pdf_tables_page_gate"
+required-features = ["pdf", "tables-eval"]
+
+[[bench]]
+name = "tables"
+harness = false
+required-features = ["tables-eval"]
+
+[[bench]]
+name = "office"
+harness = false
+required-features = ["office"]
+
+[[test]]
+name = "ocr_paddle_smoke"
+required-features = ["ocr-paddle"]
+
+[[test]]
+name = "ocr_eval"
+required-features = ["ocr-paddle"]
+
+[[bench]]
+name = "ocr"
+harness = false
+required-features = ["ocr"]
+
+[[test]]
+name = "ocr_memory"
+required-features = ["ocr-paddle"]
+
+[[test]]
+name = "pdf_text_quality"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_links"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_text_corpus"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_hidden"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_hidden_ocg"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_hidden_synth"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_hidden_turned"
+required-features = ["pdf"]
+
+[[test]]
+name = "telemetry"
+required-features = ["pdf", "markup", "telemetry"]
+
+[[test]]
+name = "pdf_resume_set"
+required-features = ["pdf"]

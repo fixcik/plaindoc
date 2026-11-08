@@ -1,0 +1,30 @@
+[package]
+name = "plaindoc-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "plaindoc"
+path = "src/main.rs"
+
+[features]
+default = ["ocr"]
+# OCR with PaddleOCR; base models compiled in (+~13 MB models, +~18 MB static ONNX Runtime).
+ocr = ["plaindoc-formats/bundled-models"]
+# Compiles the library's tracing spans and events in (no subscriber is installed): for overhead runs.
+telemetry = ["plaindoc-formats/telemetry"]
+
+[dependencies]
+plaindoc-core.workspace = true
+plaindoc-formats = { workspace = true, features = ["text", "pdf", "office", "markup", "odf", "rtf"] }
+clap.workspace = true
+rayon.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
+tempfile.workspace = true

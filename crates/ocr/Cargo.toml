@@ -1,0 +1,31 @@
+[package]
+name = "plaindoc-ocr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = []
+# PaddleOCR PP-OCRv5 engine on ONNX Runtime (static, CPU EP).
+paddle = ["dep:ort"]
+# Embed det + cyrillic rec ONNX via include_bytes!; build.rs takes them from
+# $PLAINDOC_OCR_BUNDLE_DIR, crates/ocr/models or the user models dir, downloading them there
+# when missing (model-manifest.txt, sha256-checked; docs/building.md).
+bundled-models = []
+
+[dependencies]
+thiserror.workspace = true
+image.workspace = true
+sha2.workspace = true
+ort = { workspace = true, optional = true }
+
+[build-dependencies]
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[[test]]
+name = "paddle_png"
+required-features = ["paddle"]

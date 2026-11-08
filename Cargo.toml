@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/formats", "crates/ocr", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+plaindoc-core = { path = "crates/core" }
+plaindoc-formats = { path = "crates/formats", default-features = false }
+plaindoc-ocr = { path = "crates/ocr" }
+image = { version = "0.25.10", default-features = false }
+sha2 = "0.10.9"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+rayon = "1.12.0"
+tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "download-binaries", "tls-rustls", "api-27"] }
+csv = "1.4.0"
+encoding_rs = "0.8.44"
+chardetng = "1.0.0"
+clap = { version = "4.6.7", features = ["derive"] }
+walkdir = "2.5.0"
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+tempfile = "3.27.0"
+scraper = { version = "0.29.0", default-features = false }
+html5ever = "0.40.1"
+ego-tree = "0.11.1"
+roxmltree = "0.21.2"
+zip = { version = "9.1", default-features = false, features = ["deflate"] }
+pdf_oxide = { git = "https://github.com/fixcik/pdf_oxide", rev = "71555ed4ed8282b5078c7d808ebc7966aee83117", features = ["parallel"] }
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release]
+panic = "unwind"

@@ -1,0 +1,6 @@
+# Pinned OCR models embedded by feature `bundled-models` (PP-OCRv5, Apache-2.0).
+# The single source of URLs and hashes: read by build.rs and scripts/fetch-ocr-models.sh;
+# src/models.rs::MANIFEST is checked against it by a unit test.
+# id sha256 size url
+PP-OCRv5_mobile_det a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d 4826518 https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d/inference.onnx
+cyrillic_PP-OCRv5_mobile_rec 5371ee1ddaa7983cc62d0818d99e982b6804638c85e4f960d59a574094e172e5 8048799 https://huggingface.co/PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx/resolve/2cef88145434beb8afa9dd82d77d799eb1ad7b29/inference.onnx

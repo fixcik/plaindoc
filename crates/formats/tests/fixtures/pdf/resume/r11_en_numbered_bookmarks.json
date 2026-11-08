@@ -1,0 +1,120 @@
+{
+ "description": {
+  "lang": "en",
+  "title": "bold",
+  "marker": "en",
+  "cols": 1,
+  "pages": 1,
+  "numbered": true,
+  "bookmarks": true
+ },
+ "pages": 1,
+ "tables": 0,
+ "headings": [
+  {
+   "text": "Jane Sample",
+   "level": 1,
+   "printed": "Jane Sample"
+  },
+  {
+   "text": "1. Summary",
+   "level": 2,
+   "printed": "1. Summary"
+  },
+  {
+   "text": "2. Experience",
+   "level": 2,
+   "printed": "2. Experience"
+  },
+  {
+   "text": "2.1 Acme Widgets Ltd",
+   "level": 3,
+   "printed": "2.1 Acme Widgets Ltd"
+  },
+  {
+   "text": "2.2 Northwind Samples",
+   "level": 3,
+   "printed": "2.2 Northwind Samples"
+  },
+  {
+   "text": "3. Education",
+   "level": 2,
+   "printed": "3. Education"
+  },
+  {
+   "text": "4. Additional",
+   "level": 2,
+   "printed": "4. Additional"
+  }
+ ],
+ "list_items": [
+  {
+   "text": "Built an order tracking module and cut request handling time by a third",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Set up build and deployment pipelines and moved the team to weekly releases",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Project details: project page",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Optimised slow database queries so that the load dropped by half",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Wrote automated tests for the main scenarios and plugged them into CI",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "English: reading technical literature",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  },
+  {
+   "text": "Driving licence B",
+   "ordered": false,
+   "depth": 0,
+   "marker": "–"
+  }
+ ],
+ "links": [
+  {
+   "text": "jane@example.test",
+   "url": "mailto:jane@example.test"
+  },
+  {
+   "text": "example.test/jane",
+   "url": "https://example.test/jane"
+  },
+  {
+   "text": "project page",
+   "url": "https://example.test/project"
+  }
+ ]
+}

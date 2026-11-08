@@ -1,0 +1,66 @@
+== train: порог 0.10, правила -
+  icdar found 70 -> 69 (потеряно 1), FP 12 -> 3, teds_all 0.688 -> 0.691
+      потеряно ('chart', 'T')           1  eu-015:p2(10x6,p=0.21,teds=-0.20)
+      остались FP: chart=3
+  pt1m  found 285 -> 284 (потеряно 1), FP 157 -> 53, teds_all 0.415 -> 0.413
+      потеряно ('math', 'T')            1  PMC5698862:p7(7x4,p=0.07,teds=0.78)
+      остались FP: other=23, prose=11, chart=6, article_header=5, math=5, figure_labels=2, caption_box=1
+== test: порог 0.10, правила -
+  odl   found 45 -> 44 (потеряно 1), FP 18 -> 9, teds_all 0.758 -> 0.740
+      потеряно ('caption_box', 'L')     1  01030000000121:p1(2x2,p=0.02,teds=1.00)
+      остались FP: chart=3, prose=3, caption_box=1, toc=1, list=1
+  icdar found 65 -> 65 (потеряно 0), FP 6 -> 0, teds_all 0.661 -> 0.661
+      остались FP: 
+  pt1m  found 333 -> 333 (потеряно 0), FP 141 -> 33, teds_all 0.398 -> 0.398
+      остались FP: diagram=10, other=6, prose=6, figure_labels=5, chart=3, caption_box=3
+== train: порог 0.20, правила -
+  icdar found 70 -> 68 (потеряно 2), FP 12 -> 3, teds_all 0.688 -> 0.690
+      потеряно ('other', 'T')           1  eu-015:p1(3x3,p=0.17,teds=0.12)
+      потеряно ('chart', 'T')           1  eu-015:p2(10x6,p=0.21,teds=-0.20)
+      остались FP: chart=3
+  pt1m  found 285 -> 283 (потеряно 2), FP 157 -> 35, teds_all 0.415 -> 0.413
+      потеряно ('other', 'T')           1  PMC3103197:p4(3x5,p=0.14,teds=0.10)
+      потеряно ('math', 'T')            1  PMC5698862:p7(7x4,p=0.07,teds=0.78)
+      остались FP: other=14, prose=11, article_header=4, math=3, chart=2, figure_labels=1
+== test: порог 0.20, правила -
+  odl   found 45 -> 43 (потеряно 2), FP 18 -> 5, teds_all 0.758 -> 0.722
+      потеряно ('diagram', 'L')         1  01030000000119:p1(6x3,p=0.17,teds=1.00)
+      потеряно ('caption_box', 'L')     1  01030000000121:p1(2x2,p=0.02,teds=1.00)
+      остались FP: chart=2, prose=2, toc=1
+  icdar found 65 -> 65 (потеряно 0), FP 6 -> 0, teds_all 0.661 -> 0.661
+      остались FP: 
+  pt1m  found 333 -> 331 (потеряно 2), FP 141 -> 18, teds_all 0.398 -> 0.397
+      потеряно ('other', 'L')           1  PMC4422702:p7(2x3,p=0.13,teds=0.47)
+      потеряно ('other', 'T')           1  PMC4748553:p15(3x3,p=0.12,teds=0.14)
+      остались FP: diagram=7, prose=6, other=2, figure_labels=2, chart=1
+== train: порог 0.40, правила -
+  icdar found 70 -> 67 (потеряно 3), FP 12 -> 0, teds_all 0.688 -> 0.692
+      потеряно ('chart', 'T')           2  eu-015:p2(11x6,p=0.10,teds=-0.22), eu-015:p2(10x6,p=0.21,teds=-0.20)
+      потеряно ('other', 'T')           1  eu-015:p1(3x3,p=0.17,teds=0.12)
+      остались FP: 
+  pt1m  found 285 -> 268 (потеряно 17), FP 157 -> 23, teds_all 0.415 -> 0.398
+      потеряно ('other', 'T')           7  PMC2064926:p9(7x5,p=0.25,teds=0.47), PMC3086630:p2(3x3,p=0.22,teds=0.62), PMC3103197:p4(3x5,p=0.14,teds=0.10), PMC3320529:p8(5x5,p=0.28,teds=0.25)
+      потеряно ('prose', 'T')           4  PMC3035260:p5(5x3,p=0.24,teds=0.32), PMC3460767:p5(3x13,p=0.25,teds=0.29), PMC4995762:p2(3x2,p=0.25,teds=0.19), PMC5784812:p3(4x4,p=0.40,teds=0.81)
+      потеряно ('math', 'T')            3  PMC4351607:p4(3x4,p=0.39,teds=0.32), PMC5698862:p7(7x4,p=0.07,teds=0.78), PMC5735208:p4(3x4,p=0.39,teds=0.76)
+      потеряно ('chart', 'T')           2  PMC3173347:p2(3x7,p=0.23,teds=0.73), PMC5874492:p7(15x5,p=0.29,teds=0.60)
+      потеряно ('diagram', 'L')         1  PMC4890000:p5(7x4,p=0.39,teds=0.67)
+      остались FP: other=12, prose=7, article_header=2, chart=1, math=1
+== test: порог 0.40, правила -
+  odl   found 45 -> 40 (потеряно 5), FP 18 -> 1, teds_all 0.758 -> 0.674
+      потеряно ('other', 'T')           1  01030000000117:p1(3x4,p=0.33,teds=0.76)
+      потеряно ('diagram', 'L')         1  01030000000119:p1(6x3,p=0.17,teds=1.00)
+      потеряно ('other', 'L')           1  01030000000120:p1(3x5,p=0.25,teds=1.00)
+      потеряно ('caption_box', 'L')     1  01030000000121:p1(2x2,p=0.02,teds=1.00)
+      потеряно ('prose', 'T')           1  01030000000132:p1(4x2,p=0.34,teds=0.87)
+      остались FP: toc=1
+  icdar found 65 -> 64 (потеряно 1), FP 6 -> 0, teds_all 0.661 -> 0.651
+      потеряно ('other', 'T')           1  us-021:p2(5x3,p=0.40,teds=0.80)
+      остались FP: 
+  pt1m  found 333 -> 314 (потеряно 19), FP 141 -> 9, teds_all 0.398 -> 0.384
+      потеряно ('other', 'T')          11  PMC2245935:p5(9x4,p=0.36,teds=0.25), PMC2944349:p4(4x6,p=0.29,teds=0.98), PMC3091768:p5(4x4,p=0.35,teds=0.16), PMC3283319:p6(3x8,p=0.35,teds=0.25)
+      потеряно ('prose', 'T')           3  PMC4597112:p5(4x5,p=0.38,teds=0.50), PMC4632717:p10(4x2,p=0.25,teds=0.81), PMC5833104:p14(7x5,p=0.35,teds=0.21)
+      потеряно ('chart', 'T')           2  PMC4597112:p9(9x7,p=0.37,teds=0.37), PMC5781055:p3(4x6,p=0.20,teds=0.22)
+      потеряно ('list', 'T')            1  PMC2588615:p4(6x3,p=0.35,teds=0.58)
+      потеряно ('other', 'L')           1  PMC4422702:p7(2x3,p=0.13,teds=0.47)
+      потеряно ('math', 'T')            1  PMC4643125:p8(3x4,p=0.25,teds=0.30)
+      остались FP: diagram=7, prose=2

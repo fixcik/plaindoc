@@ -1,0 +1,674 @@
+[
+ {
+  "file": "h01_white_on_white.pdf",
+  "kind": "hidden",
+  "idx": 1,
+  "absent": [
+   "PWNED01"
+  ],
+  "present": [
+   "VIS01"
+  ],
+  "note": "1 g text on empty white page"
+ },
+ {
+  "file": "h02_near_white.pdf",
+  "kind": "hidden",
+  "idx": 2,
+  "absent": [
+   "PWNED02"
+  ],
+  "present": [
+   "VIS02"
+  ],
+  "note": "0.97 g text on white"
+ },
+ {
+  "file": "h03_white_on_white_rect.pdf",
+  "kind": "hidden",
+  "idx": 3,
+  "absent": [
+   "PWNED03"
+  ],
+  "present": [
+   "VIS03"
+  ],
+  "note": "white filled rect then white text over it"
+ },
+ {
+  "file": "h04_under_image.pdf",
+  "kind": "hidden",
+  "idx": 4,
+  "absent": [
+   "PWNED04"
+  ],
+  "present": [
+   "VIS04"
+  ],
+  "note": "black text, then opaque image drawn over it"
+ },
+ {
+  "file": "h05_under_rect.pdf",
+  "kind": "hidden",
+  "idx": 5,
+  "absent": [
+   "PWNED05"
+  ],
+  "present": [
+   "VIS05"
+  ],
+  "note": "black text, then white filled rect drawn over it"
+ },
+ {
+  "file": "h06_tiny_0_5pt.pdf",
+  "kind": "hidden",
+  "idx": 6,
+  "absent": [
+   "PWNED06"
+  ],
+  "present": [
+   "VIS06"
+  ],
+  "note": "Tf 0.5"
+ },
+ {
+  "file": "h07_tiny_1pt.pdf",
+  "kind": "hidden",
+  "idx": 7,
+  "absent": [
+   "PWNED07"
+  ],
+  "present": [
+   "VIS07"
+  ],
+  "note": "Tf 1"
+ },
+ {
+  "file": "h08_tiny_via_tm.pdf",
+  "kind": "hidden",
+  "idx": 8,
+  "absent": [
+   "PWNED08"
+  ],
+  "present": [
+   "VIS08"
+  ],
+  "note": "Tf 12 but Tm scale 0.04 (effective 0.48 pt)"
+ },
+ {
+  "file": "h09_off_mediabox.pdf",
+  "kind": "hidden",
+  "idx": 9,
+  "absent": [
+   "PWNED09"
+  ],
+  "present": [
+   "VIS09"
+  ],
+  "note": "text at x=-700 and y=-100 (outside MediaBox)"
+ },
+ {
+  "file": "h10_off_cropbox.pdf",
+  "kind": "hidden",
+  "idx": 10,
+  "absent": [
+   "PWNED10"
+  ],
+  "present": [
+   "VIS10"
+  ],
+  "note": "CropBox [36 36 576 756]; text at y=12 inside MediaBox only"
+ },
+ {
+  "file": "h11_ocg_off.pdf",
+  "kind": "hidden",
+  "idx": 11,
+  "absent": [
+   "PWNED11"
+  ],
+  "present": [
+   "VIS11"
+  ],
+  "note": "content in optional content group that is OFF in /D"
+ },
+ {
+  "file": "h12_ocg_off_xobject.pdf",
+  "kind": "hidden",
+  "idx": 12,
+  "absent": [
+   "PWNED12"
+  ],
+  "present": [
+   "VIS12"
+  ],
+  "note": "Form XObject with /OC -> OFF group"
+ },
+ {
+  "file": "h13_tr3_no_image.pdf",
+  "kind": "hidden",
+  "idx": 13,
+  "absent": [
+   "PWNED13"
+  ],
+  "present": [
+   "VIS13"
+  ],
+  "note": "3 Tr invisible text, page has no image"
+ },
+ {
+  "file": "h14_tr7_clip.pdf",
+  "kind": "hidden",
+  "idx": 14,
+  "absent": [
+   "PWNED14"
+  ],
+  "present": [
+   "VIS14"
+  ],
+  "note": "7 Tr (clip only) text"
+ },
+ {
+  "file": "h15_clip_zero.pdf",
+  "kind": "hidden",
+  "idx": 15,
+  "absent": [
+   "PWNED15"
+  ],
+  "present": [
+   "VIS15"
+  ],
+  "note": "0 0 0 0 re W n then text"
+ },
+ {
+  "file": "h16_clip_elsewhere.pdf",
+  "kind": "hidden",
+  "idx": 16,
+  "absent": [
+   "PWNED16"
+  ],
+  "present": [
+   "VIS16"
+  ],
+  "note": "clip rect 10x10 in corner, text outside clip"
+ },
+ {
+  "file": "h17_opacity_0.pdf",
+  "kind": "hidden",
+  "idx": 17,
+  "absent": [
+   "PWNED17"
+  ],
+  "present": [
+   "VIS17"
+  ],
+  "note": "ExtGState ca 0"
+ },
+ {
+  "file": "h18_opacity_0_02.pdf",
+  "kind": "hidden",
+  "idx": 18,
+  "absent": [
+   "PWNED18"
+  ],
+  "present": [
+   "VIS18"
+  ],
+  "note": "ExtGState ca 0.02"
+ },
+ {
+  "file": "h19_annot_text_hidden.pdf",
+  "kind": "hidden",
+  "idx": 19,
+  "absent": [
+   "PWNED19"
+  ],
+  "present": [
+   "VIS19"
+  ],
+  "note": "/Text annotation with /Contents payload, flag Hidden"
+ },
+ {
+  "file": "h20_annot_freetext_hidden.pdf",
+  "kind": "hidden",
+  "idx": 20,
+  "absent": [
+   "PWNED20"
+  ],
+  "present": [
+   "VIS20"
+  ],
+  "note": "FreeText annotation, hidden flag, white text in AP"
+ },
+ {
+  "file": "h21_info_metadata.pdf",
+  "kind": "hidden",
+  "idx": 21,
+  "absent": [
+   "PWNED21"
+  ],
+  "present": [
+   "VIS21"
+  ],
+  "note": "payload in Info /Subject /Keywords /Author"
+ },
+ {
+  "file": "h22_xmp_metadata.pdf",
+  "kind": "hidden",
+  "idx": 22,
+  "absent": [
+   "PWNED22"
+  ],
+  "present": [
+   "VIS22"
+  ],
+  "note": "payload in XMP dc:description / pdf:Keywords"
+ },
+ {
+  "file": "h23_unicode_tags.pdf",
+  "kind": "hidden",
+  "idx": 23,
+  "absent": [
+   "PWNED23"
+  ],
+  "present": [
+   "VIS23"
+  ],
+  "note": "ToUnicode maps space -> payload in U+E00xx tag chars; visible: nothing"
+ },
+ {
+  "file": "h24_zero_width.pdf",
+  "kind": "hidden",
+  "idx": 24,
+  "absent": [
+   "PWNED24"
+  ],
+  "present": [
+   "VIS24"
+  ],
+  "note": "visible decoy glyphs; ToUnicode adds payload chars interleaved with U+200B"
+ },
+ {
+  "file": "h25_bidi_override.pdf",
+  "kind": "hidden",
+  "idx": 25,
+  "absent": [
+   "PWNED25"
+  ],
+  "present": [
+   "VIS25"
+  ],
+  "note": "ToUnicode: RLO + reversed payload + PDF"
+ },
+ {
+  "file": "h26_tiny_white.pdf",
+  "kind": "hidden",
+  "idx": 26,
+  "absent": [
+   "PWNED26"
+  ],
+  "present": [
+   "VIS26"
+  ],
+  "note": "0.5 pt and white"
+ },
+ {
+  "file": "h27_fake_ocr_layer.pdf",
+  "kind": "hidden",
+  "idx": 27,
+  "absent": [
+   "PWNED27"
+  ],
+  "present": [
+   "VIS27"
+  ],
+  "note": "scan image + Tr3 layer whose words are the payload (OCR-layer impersonation)"
+ },
+ {
+  "file": "h28_acroform_hidden_field.pdf",
+  "kind": "hidden",
+  "idx": 28,
+  "absent": [
+   "PWNED28"
+  ],
+  "present": [
+   "VIS28"
+  ],
+  "note": "hidden text field with /V payload"
+ },
+ {
+  "file": "h29_black_on_black.pdf",
+  "kind": "hidden",
+  "idx": 29,
+  "absent": [
+   "PWNED29"
+  ],
+  "present": [
+   "VIS29"
+  ],
+  "note": "black rect, black text"
+ },
+ {
+  "file": "h30_actualtext_inline.pdf",
+  "kind": "hidden",
+  "idx": 30,
+  "absent": [
+   "PWNED30"
+  ],
+  "present": [
+   "VIS30"
+  ],
+  "note": "/Span /ActualText replaces visible 'See appendix A.' with payload"
+ },
+ {
+  "file": "h31_white_cmyk.pdf",
+  "kind": "hidden",
+  "idx": 31,
+  "absent": [
+   "PWNED31"
+  ],
+  "present": [
+   "VIS31"
+  ],
+  "note": "0 0 0 0 k (CMYK white) text"
+ },
+ {
+  "file": "h32_under_image_partial.pdf",
+  "kind": "hidden",
+  "idx": 32,
+  "absent": [
+   "PWNED32"
+  ],
+  "present": [
+   "VIS32"
+  ],
+  "note": "white image covers ~92% of the text width"
+ },
+ {
+  "file": "h33_ocg_off_print_on.pdf",
+  "kind": "hidden",
+  "idx": 33,
+  "absent": [
+   "PWNED33"
+  ],
+  "present": [
+   "VIS33"
+  ],
+  "note": "OCG OFF for view, ON for print (usage dict)"
+ },
+ {
+  "file": "h34_under_dark_rect.pdf",
+  "kind": "hidden",
+  "idx": 34,
+  "absent": [
+   "PWNED34"
+  ],
+  "present": [
+   "VIS34"
+  ],
+  "note": "black text, then dark-blue filled rect drawn over it"
+ },
+ {
+  "file": "c01_ocr_scan_tr3.pdf",
+  "kind": "control",
+  "idx": 1,
+  "absent": [],
+  "present": [
+   "KEEP01",
+   "VIS01"
+  ],
+  "note": "scan image + Tr3 text layer (ocrmypdf-like)"
+ },
+ {
+  "file": "c02_ocr_scan_glyphless.pdf",
+  "kind": "control",
+  "idx": 2,
+  "absent": [],
+  "present": [
+   "KEEP02",
+   "VIS02"
+  ],
+  "note": "scan image + Tr3 layer in /GlyphLessFont"
+ },
+ {
+  "file": "c03_white_on_dark.pdf",
+  "kind": "control",
+  "idx": 3,
+  "absent": [],
+  "present": [
+   "KEEP03",
+   "VIS03"
+  ],
+  "note": "dark rect then white text"
+ },
+ {
+  "file": "c04_footnote_6pt.pdf",
+  "kind": "control",
+  "idx": 4,
+  "absent": [],
+  "present": [
+   "KEEP04",
+   "VIS04"
+  ],
+  "note": "6 pt footnote and 5 pt superscript"
+ },
+ {
+  "file": "c05_fine_print_4pt.pdf",
+  "kind": "control",
+  "idx": 5,
+  "absent": [],
+  "present": [
+   "KEEP05",
+   "VIS05"
+  ],
+  "note": "4 pt legal fine print"
+ },
+ {
+  "file": "c06_header_footer.pdf",
+  "kind": "control",
+  "idx": 6,
+  "absent": [],
+  "present": [
+   "KEEP06",
+   "VIS06"
+  ],
+  "note": "header y=770, footer y=20, page number"
+ },
+ {
+  "file": "c07_bleed_marks.pdf",
+  "kind": "control",
+  "idx": 7,
+  "absent": [],
+  "present": [
+   "KEEP07",
+   "VIS07"
+  ],
+  "note": "MediaBox larger than CropBox; KEEP07 straddles crop edge; SLUG07 fully outside"
+ },
+ {
+  "file": "c08_ocg_on_and_alt_off.pdf",
+  "kind": "control",
+  "idx": 8,
+  "absent": [],
+  "present": [
+   "KEEP08",
+   "VIS08"
+  ],
+  "note": "ON layer KEEP08; OFF alt-language layer ALT08 (drop by design)"
+ },
+ {
+  "file": "c09_light_gray.pdf",
+  "kind": "control",
+  "idx": 9,
+  "absent": [],
+  "present": [
+   "KEEP09",
+   "VIS09"
+  ],
+  "note": "0.85 g rotated DRAFT watermark and 0.75 g placeholder"
+ },
+ {
+  "file": "c10_text_over_image.pdf",
+  "kind": "control",
+  "idx": 10,
+  "absent": [],
+  "present": [
+   "KEEP10",
+   "VIS10"
+  ],
+  "note": "light image then dark text over it"
+ },
+ {
+  "file": "c11_clip_normal.pdf",
+  "kind": "control",
+  "idx": 11,
+  "absent": [],
+  "present": [
+   "KEEP11",
+   "VIS11"
+  ],
+  "note": "page-size clip then text inside"
+ },
+ {
+  "file": "c12_opacity_half.pdf",
+  "kind": "control",
+  "idx": 12,
+  "absent": [],
+  "present": [
+   "KEEP12",
+   "VIS12"
+  ],
+  "note": "ca 0.5 text"
+ },
+ {
+  "file": "c13_unicode_legit.pdf",
+  "kind": "control",
+  "idx": 13,
+  "absent": [],
+  "present": [
+   "KEEP13",
+   "VIS13"
+  ],
+  "note": "SHY, ZWNJ (Persian), RLM (Hebrew), ZWJ emoji, embedded bidi"
+ },
+ {
+  "file": "c14_colored_on_colored.pdf",
+  "kind": "control",
+  "idx": 14,
+  "absent": [],
+  "present": [
+   "KEEP14",
+   "VIS14"
+  ],
+  "note": "yellow on blue; dark red on pink"
+ },
+ {
+  "file": "c15_form_xobject_visible.pdf",
+  "kind": "control",
+  "idx": 15,
+  "absent": [],
+  "present": [
+   "KEEP15",
+   "VIS15"
+  ],
+  "note": "text in Form XObject without /OC"
+ },
+ {
+  "file": "c16_mediabox_offset.pdf",
+  "kind": "control",
+  "idx": 16,
+  "absent": [],
+  "present": [
+   "KEEP16",
+   "VIS16"
+  ],
+  "note": "MediaBox [100 100 712 892]"
+ },
+ {
+  "file": "c17_rotated_page.pdf",
+  "kind": "control",
+  "idx": 17,
+  "absent": [],
+  "present": [
+   "KEEP17",
+   "VIS17"
+  ],
+  "note": "/Rotate 90 landscape content"
+ },
+ {
+  "file": "c18_partial_offpage.pdf",
+  "kind": "control",
+  "idx": 18,
+  "absent": [],
+  "present": [
+   "KEEP18",
+   "VIS18"
+  ],
+  "note": "line starting at x=480 runs past x=612"
+ },
+ {
+  "file": "c19_ocr_scan_jitter.pdf",
+  "kind": "control",
+  "idx": 19,
+  "absent": [],
+  "present": [
+   "KEEP19",
+   "VIS19"
+  ],
+  "note": "scan image inset 20pt, Tr3 words at original coords (partly outside image)"
+ },
+ {
+  "file": "c20_stroke_modes.pdf",
+  "kind": "control",
+  "idx": 20,
+  "absent": [],
+  "present": [
+   "KEEP20",
+   "VIS20"
+  ],
+  "note": "Tr 1 stroke-only black; Tr 2 fill white + stroke black"
+ },
+ {
+  "file": "c21_actualtext_legit.pdf",
+  "kind": "control",
+  "idx": 21,
+  "absent": [],
+  "present": [
+   "KEEP21",
+   "VIS21"
+  ],
+  "note": "/ActualText (fi) for ligature glyph; KEEP21"
+ },
+ {
+  "file": "c22_dark_slide.pdf",
+  "kind": "control",
+  "idx": 22,
+  "absent": [],
+  "present": [
+   "KEEP22",
+   "VIS22"
+  ],
+  "note": "full-page dark rect then white text"
+ },
+ {
+  "file": "c23_form_field_visible.pdf",
+  "kind": "control",
+  "idx": 23,
+  "absent": [],
+  "present": [
+   "KEEP23",
+   "VIS23"
+  ],
+  "note": "visible text field with appearance"
+ },
+ {
+  "file": "c24_chart_labels_3pt.pdf",
+  "kind": "control",
+  "idx": 24,
+  "absent": [],
+  "present": [
+   "KEEP24",
+   "VIS24"
+  ],
+  "note": "3 pt axis tick labels"
+ }
+]

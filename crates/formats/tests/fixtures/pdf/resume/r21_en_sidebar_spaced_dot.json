@@ -1,0 +1,101 @@
+{
+ "description": {
+  "lang": "en",
+  "title": "spaced",
+  "marker": "dot",
+  "cols": 2,
+  "pages": 1
+ },
+ "pages": 1,
+ "tables": 0,
+ "headings": [
+  {
+   "text": "Jane Sample",
+   "level": 1,
+   "printed": "Jane Sample"
+  },
+  {
+   "text": "SUMMARY",
+   "level": 2,
+   "printed": "S U M M A R Y"
+  },
+  {
+   "text": "EXPERIENCE",
+   "level": 2,
+   "printed": "E X P E R I E N C E"
+  },
+  {
+   "text": "EDUCATION",
+   "level": 2,
+   "printed": "E D U C A T I O N"
+  },
+  {
+   "text": "CONTACTS",
+   "level": 2,
+   "printed": "C O N T A C T S"
+  },
+  {
+   "text": "SKILLS",
+   "level": 2,
+   "printed": "S K I L L S"
+  }
+ ],
+ "list_items": [
+  {
+   "text": "Built an order tracking module and cut request handling time by a third",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Set up build and deployment pipelines and moved the team to weekly releases",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Project details: project page",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Trained new colleagues and wrote the code review guidelines for the team",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Optimised slow database queries so that the load dropped by half",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  },
+  {
+   "text": "Wrote automated tests for the main scenarios and plugged them into CI",
+   "ordered": false,
+   "depth": 0,
+   "marker": "•"
+  }
+ ],
+ "links": [
+  {
+   "text": "project page",
+   "url": "https://example.test/project"
+  },
+  {
+   "text": "jane@example.test",
+   "url": "mailto:jane@example.test"
+  },
+  {
+   "text": "example.test/jane",
+   "url": "https://example.test/jane"
+  }
+ ]
+}

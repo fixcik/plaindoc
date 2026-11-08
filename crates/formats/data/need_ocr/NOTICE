@@ -1,0 +1,29 @@
+bigrams.json — letter-bigram table of the need-OCR classifier
+
+- Content: log10 P(b|a) letter-bigram tables, add-one smoothing, "ё" folded into "е", 3 decimals.
+- "ru" (32 letters): counted from public-domain Russian texts of ru.wikisource.org (plain page
+  text, about 1.12 M letter pairs, half literature and half law; a fixed letter-pair budget per
+  work, long works cut at a prefix):
+  - literature, PD-old-70: Тургенев «Отцы и дети»; Достоевский «Бедные люди»; Лермонтов «Герой
+    нашего времени»; Пушкин «Капитанская дочка»; Чехов «Остров Сахалин»; Куприн «Поединок»
+    (I–VI, IX); Ключевский «Курс русской истории» (лекции I–II);
+  - law, PD-RU-exempt (official documents, Civil Code of the RF art. 1259(6)): Конституция
+    Российской Федерации; Уголовный кодекс РФ; Трудовой кодекс РФ; Гражданский кодекс РФ
+    (the main page and chapters of each).
+- "en" (26 letters): counted from the ground-truth Markdown of opendataloader-bench (Apache-2.0),
+  unchanged from the first table. That corpus is taken from the DP-Bench dataset (Upstage,
+  MIT licence, https://huggingface.co/datasets/upstage/dp-bench; documents from the Library of
+  Congress, open educational resources and the authors' own files, per its card). The table
+  holds only letter-pair frequencies (log10 probabilities to 3 decimals), no text of the
+  documents; the benchmark repository and the dataset are credited here.
+- Built by the research script `build_pd.py RU_DIR EN_DIR OUT.json` (same procedure as the
+  ocr-need `scripts/build_bigrams.py`, outside the repository); pinned sha256
+  8b20b8d441981919706100317740d02ec7f3f92d1e569caf19d4358b342a170b (`build.rs` and
+  `Bigrams::from_bytes` refuse any other file). The golden `bigram_lp` values are computed with
+  exactly this file. The classifier thresholds (`bigram` -1.35 / -1.9) were calibrated by the
+  research on its Russian Wikipedia table and are kept unchanged: the task 14a gate gives the
+  same result with this table.
+- No data derived from Wikipedia (CC BY-SA) is included: the "ru" half is counted only from the
+  public-domain texts listed above.
+- Deleting the file is enough for a build without the table: the classifier then runs without the
+  bigram rule (one Info warning per PDF).

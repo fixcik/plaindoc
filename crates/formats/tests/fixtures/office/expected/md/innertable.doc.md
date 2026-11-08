@@ -1,0 +1,12 @@
+<table>
+<tbody>
+<tr><td>A</td><td>B</td><td>C</td></tr>
+<tr><td>D</td><td>E<table>
+<tbody>
+<tr><td>1</td><td>2</td></tr>
+<tr><td>3</td><td>4</td></tr>
+</tbody>
+</table>F</td><td>G</td></tr>
+<tr><td>H</td><td>I</td><td>J</td></tr>
+</tbody>
+</table>

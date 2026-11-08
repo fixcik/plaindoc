@@ -1,0 +1,108 @@
+{
+ "description": {
+  "lang": "ru",
+  "title": "rule",
+  "marker": "hy",
+  "cols": 1,
+  "pages": 1
+ },
+ "pages": 1,
+ "tables": 0,
+ "headings": [
+  {
+   "text": "Алексей Примеров",
+   "level": 1,
+   "printed": "Алексей Примеров"
+  },
+  {
+   "text": "О СЕБЕ",
+   "level": 2,
+   "printed": "О СЕБЕ"
+  },
+  {
+   "text": "ОПЫТ РАБОТЫ",
+   "level": 2,
+   "printed": "ОПЫТ РАБОТЫ"
+  },
+  {
+   "text": "ОБРАЗОВАНИЕ",
+   "level": 2,
+   "printed": "ОБРАЗОВАНИЕ"
+  },
+  {
+   "text": "ДОПОЛНИТЕЛЬНО",
+   "level": 2,
+   "printed": "ДОПОЛНИТЕЛЬНО"
+  }
+ ],
+ "list_items": [
+  {
+   "text": "Разработал модуль учёта заказов, сократил время обработки заявки на треть",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Настроил сборку и выкладку, перевёл команду на еженедельные релизы",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Провёл обучение для новых сотрудников и подготовил регламент проверки кода",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Подробности проекта: страница проекта",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Провёл обучение для новых сотрудников и подготовил регламент проверки кода",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Оптимизировал медленные запросы к базе данных, нагрузка снизилась вдвое",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Написал автоматические тесты для основных сценариев и подключил их к конвейеру",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Английский: чтение технической литературы",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  },
+  {
+   "text": "Права категории B",
+   "ordered": false,
+   "depth": 0,
+   "marker": "-"
+  }
+ ],
+ "links": [
+  {
+   "text": "alex@example.test",
+   "url": "mailto:alex@example.test"
+  },
+  {
+   "text": "example.test/alex",
+   "url": "https://example.test/alex"
+  },
+  {
+   "text": "страница проекта",
+   "url": "https://example.test/project"
+  }
+ ]
+}
