@@ -56,7 +56,7 @@ fn texts_of(els: Vec<Element>, format: DocumentFormat) -> Vec<String> {
     };
     let mut ir = ir;
     ir.metadata.format = format;
-    let (doc, _) = map_document(&ir, false, None, Pictures::default());
+    let (doc, _) = map_document(&mut ir, false, None, Pictures::default());
     doc.sections[0]
         .blocks
         .iter()

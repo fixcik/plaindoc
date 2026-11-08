@@ -9,17 +9,19 @@ use super::text::sheet_text;
 /// Days between the 1904 and 1900 date systems of spreadsheets.
 pub(crate) const DATE1904_OFFSET: f64 = 1462.0;
 
-/// `Block::Table`; cell content is mapped one level deeper, in IR order.
-pub(crate) fn map_table(t: &Table, ctx: &mut MapCtx) -> Block {
+/// `Block::Table`; cell content is mapped one level deeper, in IR order. The rows are taken out
+/// of `t` and each IR cell is freed once mapped: a large sheet is not held twice.
+pub(crate) fn map_table(t: &mut Table, ctx: &mut MapCtx) -> Block {
     let header_rows = t.rows.iter().take_while(|r| r.is_header).count();
     ctx.depth += 1;
     let mut rows = Vec::with_capacity(t.rows.len());
-    for r in &t.rows {
+    for r in std::mem::take(&mut t.rows) {
         let mut cells = Vec::with_capacity(r.cells.len());
-        for c in &r.cells {
+        for mut c in r.cells {
             let mut cell = Cell::new("").with_span(c.col_span, c.row_span);
-            cell.blocks = map_elements(&c.content, ctx);
-            cell.value = cell_value(c, ctx.date1904);
+            // The value reads the IR content as it is: before mapping takes nested tables out.
+            cell.value = cell_value(&c, ctx.date1904);
+            cell.blocks = map_elements(&mut c.content, ctx);
             cells.push(cell);
         }
         rows.push(cells);
@@ -166,7 +168,7 @@ mod tests {
 
     #[test]
     fn merged_cells_keep_spans_and_header_rows() {
-        let t = ir_table(table(vec![
+        let mut t = ir_table(table(vec![
             row(
                 vec![cell("H1", 1, 1), cell("H2", 1, 1), cell("H3", 1, 1)],
                 true,
@@ -174,7 +176,7 @@ mod tests {
             row(vec![cell("X", 1, 2), cell("Y", 2, 1)], false),
             row(vec![cell("b2", 1, 1), cell("c2", 1, 1)], false),
         ]));
-        let b = map_table(&t, &mut MapCtx::default());
+        let b = map_table(&mut t, &mut MapCtx::default());
         assert_eq!(
             sig(&b),
             vec![
@@ -193,14 +195,29 @@ mod tests {
             false,
         )]));
         c.content.push(para("F"));
-        let t = ir_table(table(vec![row(vec![c], false)]));
-        let Block::Table { rows, .. } = map_table(&t, &mut MapCtx::default()) else {
+        let mut t = ir_table(table(vec![row(vec![c], false)]));
+        let Block::Table { rows, .. } = map_table(&mut t, &mut MapCtx::default()) else {
             panic!()
         };
         assert!(
             matches!(&rows[0][0].blocks[..], [Block::Paragraph { text: e, .. }, Block::Table { .. }, Block::Paragraph { text: f, .. }] if e == "E" && f == "F")
         );
         assert!(!rows[0][0].is_simple());
+    }
+    #[test]
+    fn rows_are_taken_out_and_values_read_the_whole_cell() {
+        let mut c = typed(Some(T::Text), None, None, None, "a");
+        c.content
+            .push(table(vec![row(vec![cell("b", 1, 1)], false)]));
+        let mut t = ir_table(table(vec![row(vec![c], false)]));
+        let Block::Table { rows, .. } = map_table(&mut t, &mut MapCtx::default()) else {
+            panic!()
+        };
+        assert!(t.rows.is_empty());
+        assert_eq!(
+            rows[0][0].value,
+            val(Some(ScalarValue::Text("a\nb".into())), None, None)
+        );
     }
     #[test]
     fn xlsx_values_are_not_poorer_than_ir() {
@@ -287,12 +304,12 @@ mod tests {
     }
     #[test]
     fn ragged_table_warns_table_uncertain() {
-        let t = ir_table(table(vec![
+        let mut t = ir_table(table(vec![
             row(vec![cell("a", 1, 1), cell("b", 1, 1)], false),
             row(vec![cell("c", 1, 1)], false),
         ]));
         let mut ctx = MapCtx::default();
-        map_table(&t, &mut ctx);
+        map_table(&mut t, &mut ctx);
         assert!(
             ctx.warnings
                 .iter()

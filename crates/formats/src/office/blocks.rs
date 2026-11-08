@@ -37,14 +37,17 @@ fn flatten_to_paragraph(text: String, ctx: &mut MapCtx) -> Block {
     Block::paragraph(text, None)
 }
 
-pub(crate) fn map_elements(els: &[Element], ctx: &mut MapCtx) -> Vec<Block> {
+/// Maps `els`; table rows are taken out and freed as they are mapped (the rest stays: OCR reads
+/// the images afterwards).
+pub(crate) fn map_elements(els: &mut [Element], ctx: &mut MapCtx) -> Vec<Block> {
     if ctx.depth >= MAX_MAP_DEPTH {
         return vec![flatten_to_paragraph(elements_text(els), ctx)];
     }
     let mut out = Vec::new();
     // An empty field paragraph: its field goes in front of the hint under it.
     let mut lead_field = false;
-    for (i, e) in els.iter().enumerate() {
+    for i in 0..els.len() {
+        let (e, rest) = els[i..].split_first_mut().expect("i < len");
         match e {
             Element::Heading(h) => out.push(Block::heading(
                 h.clamped_level(),
@@ -52,7 +55,7 @@ pub(crate) fn map_elements(els: &[Element], ctx: &mut MapCtx) -> Vec<Block> {
                 None,
             )),
             Element::Paragraph(p) => {
-                let field = super::form::is_field(p, els.get(i + 1));
+                let field = super::form::is_field(p, rest.first());
                 // Spreadsheet cells are data: tabs and leading spaces stay.
                 let text = if matches!(ctx.format, DocumentFormat::Xlsx | DocumentFormat::Xls) {
                     office_oxide::ir::inline_to_text(&p.content)
@@ -97,7 +100,7 @@ pub(crate) fn map_elements(els: &[Element], ctx: &mut MapCtx) -> Vec<Block> {
                 bbox: None,
                 image: ctx.pics.info(i),
             }),
-            Element::TextBox(tb) => out.extend(map_elements(&tb.content, ctx)),
+            Element::TextBox(tb) => out.extend(map_elements(&mut tb.content, ctx)),
             Element::List(l) => out.push(map_list(l, ctx)),
             Element::Footnote(n) => {
                 let text = ctx.notes.body(false, n.id, elements_text(&n.content));
@@ -152,22 +155,25 @@ pub(crate) fn map_elements(els: &[Element], ctx: &mut MapCtx) -> Vec<Block> {
     out
 }
 
-pub(crate) fn map_list(l: &office_oxide::ir::List, ctx: &mut MapCtx) -> Block {
+pub(crate) fn map_list(l: &mut office_oxide::ir::List, ctx: &mut MapCtx) -> Block {
     Block::List {
         ordered: l.ordered,
-        items: map_items(&l.items, ctx),
+        items: map_items(&mut l.items, ctx),
         bbox: None,
     }
 }
 
-pub(crate) fn map_items(items: &[office_oxide::ir::ListItem], ctx: &mut MapCtx) -> Vec<ListItem> {
+pub(crate) fn map_items(
+    items: &mut [office_oxide::ir::ListItem],
+    ctx: &mut MapCtx,
+) -> Vec<ListItem> {
     items
-        .iter()
+        .iter_mut()
         .map(|item| {
             let mut li = ListItem::new("");
             ctx.depth += 1;
-            li.blocks = map_elements(&item.content, ctx);
-            if let Some(nested) = &item.nested {
+            li.blocks = map_elements(&mut item.content, ctx);
+            if let Some(nested) = &mut item.nested {
                 if ctx.depth >= MAX_MAP_DEPTH {
                     // Same flattening as `map_elements` at the limit.
                     li.blocks.push(flatten_to_paragraph(list_text(nested), ctx));
@@ -186,7 +192,7 @@ mod tests {
     use super::*;
     use crate::office::test_ir::*;
     fn map(els: &[Element]) -> Vec<Block> {
-        map_elements(els, &mut MapCtx::default())
+        map_elements(&mut els.to_vec(), &mut MapCtx::default())
     }
 
     #[test]
@@ -245,9 +251,9 @@ mod tests {
             marker: m.map(Into::into),
             author: a.map(Into::into),
         };
-        let doc = |els: Vec<Element>, f: D| {
+        let doc = |mut els: Vec<Element>, f: D| {
             map_elements(
-                &els,
+                &mut els,
                 &mut MapCtx {
                     format: f,
                     ..Default::default()
@@ -310,8 +316,8 @@ mod tests {
             depth: MAX_MAP_DEPTH,
             ..Default::default()
         };
-        let b = map_elements(&[para("x"), para("y")], &mut ctx);
-        map_elements(&[para("z")], &mut ctx);
+        let b = map_elements(&mut [para("x"), para("y")], &mut ctx);
+        map_elements(&mut [para("z")], &mut ctx);
         assert!(matches!(&b[..], [Block::Paragraph { text, .. }] if text == "x\ny"));
         assert_eq!(
             ctx.warnings

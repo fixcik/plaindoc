@@ -62,7 +62,7 @@ fn run_with(
         max_images,
         page_timeout,
     });
-    let (mut d, w) = document_from_ir(ir, false, None, Default::default(), &ocr);
+    let (mut d, w) = document_from_ir(ir.clone(), false, None, Default::default(), &ocr);
     d.warnings.extend(w);
     d
 }
@@ -88,7 +88,7 @@ fn header_pictures_follow_the_body_and_keep_the_ocr_pairing() {
         page_timeout: None,
     });
     let pics = pictures::Pictures::new(&plaindoc_core::ImageOptions::default());
-    let (d, _) = document_from_ir(&ir, false, None, pics, &ocr);
+    let (d, _) = document_from_ir(ir, false, None, pics, &ocr);
     let imgs: Vec<_> = (d.sections[0].blocks.iter())
         .filter_map(|b| match b {
             Block::Image {
@@ -178,6 +178,30 @@ fn sections_with_text_are_ocred_only_when_always() {
             ..
         }
     ));
+}
+
+#[test]
+fn image_next_to_a_table_is_ocred_after_the_table_is_mapped() {
+    let t = table(vec![row(vec![cell("a", 1, 1)], false)]);
+    let ir = slide(vec![t, image_with_data(png_with_bar())]);
+    let (e, cfg) = fake_ocr("Схема", 0.9);
+    let d = run(cfg, OcrMode::Always, &ir);
+    assert_eq!(e.detect_calls(), 1);
+    let b = &d.sections[0].blocks;
+    assert!(matches!(&b[0], Block::Table { rows, .. } if rows[0][0].text() == "a"));
+    assert!(matches!(&b[1], Block::Image { ocr_text: Some(t), .. } if t == "Схема"));
+    // A picture inside a cell is not a section image: neither OCRed nor paired.
+    let mut c = cell("a", 1, 1);
+    c.content.push(image_with_data(png_with_bar()));
+    let ir = slide(vec![
+        table(vec![row(vec![c], false)]),
+        image_with_data(png_with_bar()),
+    ]);
+    let (e, cfg) = fake_ocr("Схема", 0.9);
+    let d = run(cfg, OcrMode::Always, &ir);
+    assert_eq!(e.detect_calls(), 1);
+    let b = &d.sections[0].blocks;
+    assert!(matches!(&b[1], Block::Image { ocr_text: Some(t), .. } if t == "Схема"));
 }
 
 #[test]
@@ -279,7 +303,7 @@ fn sheet_named_slide_master_is_not_taken_for_the_master() {
         max_images: None,
         page_timeout: None,
     });
-    let (d, _) = document_from_ir(&ir, false, Some(1), Default::default(), &ocr);
+    let (d, _) = document_from_ir(ir, false, Some(1), Default::default(), &ocr);
     assert_eq!(d.sections.len(), 1);
     assert_eq!(e.detect_calls(), 1, "sheet 1's own image is OCRed");
     assert!(

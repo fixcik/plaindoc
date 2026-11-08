@@ -70,7 +70,7 @@ fn page_noun(kind: SectionKind) -> &'static str {
 
 /// Maps one IR section: headers, body, footers, speaker notes.
 pub(crate) fn map_section(
-    sec: &Section,
+    sec: &mut Section,
     kind: SectionKind,
     index: usize,
     ctx: &mut MapCtx,
@@ -82,15 +82,15 @@ pub(crate) fn map_section(
     }
     let (headers, footers) = header_footer_notes(sec);
     out.blocks.extend(headers);
-    let mut els: &[Element] = &sec.elements;
+    let mut skip = 0;
     let mut body = Vec::new();
     if std::mem::take(&mut ctx.find_title)
-        && let Some((n, title)) = super::title::leading_title(els, &mut ctx.notes)
+        && let Some((n, title)) = super::title::leading_title(&sec.elements, &mut ctx.notes)
     {
         body.push(Block::heading(1, title, None));
-        els = &els[n..];
+        skip = n;
     }
-    body.extend(map_elements(els, ctx));
+    body.extend(map_elements(&mut sec.elements[skip..], ctx));
     if ctx.pics.enabled && kind == SectionKind::Sheet {
         // office_oxide puts the drawing's pictures before the cells: show them after the table.
         let (pics, rest): (Vec<Block>, Vec<Block>) = body
@@ -130,9 +130,10 @@ pub(crate) fn map_section(
     out
 }
 
-/// Maps the whole IR; sheets and slides count as pages for `max_pages`.
+/// Maps the whole IR; sheets and slides count as pages for `max_pages`. Table rows are taken out
+/// of `ir` as they are mapped (see [`map_elements`]).
 pub(crate) fn map_document(
-    ir: &DocumentIR,
+    ir: &mut DocumentIR,
     date1904: bool,
     max_pages: Option<usize>,
     pics: Pictures,
@@ -154,9 +155,8 @@ pub(crate) fn map_document(
         && ir.sections.last().is_some_and(|s| {
             s.title.as_deref() == Some(office_oxide::pptx::layout::MASTER_TEXT_SECTION_TITLE)
         });
-    let (slides, tail) = ir
-        .sections
-        .split_at(ir.sections.len() - usize::from(master));
+    let split = ir.sections.len() - usize::from(master);
+    let (slides, tail) = ir.sections.split_at_mut(split);
     let total = slides.len();
     let paged = kind != SectionKind::Body;
     let n = if paged {
@@ -165,7 +165,7 @@ pub(crate) fn map_document(
         total
     };
     let sections = slides[..n]
-        .iter()
+        .iter_mut()
         .chain(tail)
         .enumerate()
         .map(|(i, s)| map_section(s, kind, i, &mut ctx))
@@ -241,14 +241,14 @@ mod tests {
             (SectionKind::Sheet, SectionKind::Slide, SectionKind::Body)
         );
         let s = map_section(
-            &section(Some("Report"), vec![heading(1, "Report")]),
+            &mut section(Some("Report"), vec![heading(1, "Report")]),
             SectionKind::Body,
             0,
             &mut MapCtx::default(),
         );
         assert_eq!(s.name, None);
         let s = map_section(
-            &section(Some("Data"), vec![]),
+            &mut section(Some("Data"), vec![]),
             SectionKind::Sheet,
             3,
             &mut MapCtx::default(),
@@ -260,7 +260,7 @@ mod tests {
     fn hidden_sheet_gets_info_warning() {
         let mut sec = section(Some("Secret"), vec![para("x")]);
         sec.hidden = true;
-        let s = map_section(&sec, SectionKind::Sheet, 0, &mut MapCtx::default());
+        let s = map_section(&mut sec, SectionKind::Sheet, 0, &mut MapCtx::default());
         assert!(
             s.warnings
                 .iter()
@@ -278,7 +278,7 @@ mod tests {
             content: vec![para("f")],
         });
         sec.speaker_notes = Some(vec![para("n")]);
-        let s = map_section(&sec, SectionKind::Slide, 0, &mut MapCtx::default());
+        let s = map_section(&mut sec, SectionKind::Slide, 0, &mut MapCtx::default());
         let kinds: Vec<_> = s
             .blocks
             .iter()
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn max_pages_limits_sheets() {
         let (doc, warns) = map_document(
-            &ir(DocumentFormat::Xlsx, 3),
+            &mut ir(DocumentFormat::Xlsx, 3),
             false,
             Some(2),
             Pictures::default(),
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn max_pages_ignored_for_body() {
         let (doc, warns) = map_document(
-            &ir(DocumentFormat::Docx, 2),
+            &mut ir(DocumentFormat::Docx, 2),
             false,
             Some(1),
             Pictures::default(),
@@ -353,11 +353,11 @@ mod tests {
             Some(office_oxide::pptx::layout::MASTER_TEXT_SECTION_TITLE),
             vec![para("m")],
         ));
-        let (doc, warns) = map_document(&d, false, Some(3), Pictures::default());
+        let (doc, warns) = map_document(&mut d, false, Some(3), Pictures::default());
         assert_eq!(doc.sections.len(), 4);
         assert_eq!(doc.metadata.page_count, Some(3));
         assert!(warns.is_empty());
-        let (doc, warns) = map_document(&d, false, Some(1), Pictures::default());
+        let (doc, warns) = map_document(&mut d, false, Some(1), Pictures::default());
         assert_eq!(doc.sections.len(), 2);
         assert_eq!(doc.sections[1].index, 1);
         assert_eq!(doc.sections[1].name.as_deref(), Some("Slide Master"));

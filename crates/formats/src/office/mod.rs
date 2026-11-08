@@ -52,22 +52,23 @@ pub(crate) type OcrSetup = Option<ocr::OcrRun>;
 #[cfg(not(feature = "ocr"))]
 pub(crate) type OcrSetup = ();
 
-/// Maps the IR and adds section diagnostics (and, with `ocr`, text of images in text-less sections).
+/// Maps the IR, freeing its tables on the way, and adds section diagnostics (and, with `ocr`,
+/// text of images in text-less sections: their bytes are still in the IR).
 pub(crate) fn document_from_ir(
-    ir: &office_oxide::ir::DocumentIR,
+    mut ir: office_oxide::ir::DocumentIR,
     date1904: bool,
     max_pages: Option<usize>,
     pics: pictures::Pictures,
     ocr: &OcrSetup,
 ) -> (Document, Vec<Warning>) {
-    let (mut out, map_warnings) = section::map_document(ir, date1904, max_pages, pics);
+    let (mut out, map_warnings) = section::map_document(&mut ir, date1904, max_pages, pics);
     for s in &mut out.sections {
         let w = diag::section_warnings(s);
         s.warnings.extend(w);
     }
     #[cfg(feature = "ocr")]
     if let Some(run) = ocr {
-        run.apply(&mut out, ir);
+        run.apply(&mut out, &ir);
     }
     #[cfg(not(feature = "ocr"))]
     let () = *ocr;
@@ -99,10 +100,11 @@ pub(crate) fn parse_in_worker(
     let date1904 = doc.as_xlsx().is_some_and(|x| x.workbook.date1904);
     let ir = doc.to_ir();
     drop(doc); // not needed past the IR: two copies of a large sheet at the peak, not three
-    let (mut out, map_warnings) = document_from_ir(&ir, date1904, max_pages, pics, ocr);
-    out.warnings.extend(diag::ir_warnings(&ir.metadata));
+    let (ir_warnings, format) = (diag::ir_warnings(&ir.metadata), ir.metadata.format);
+    let (mut out, map_warnings) = document_from_ir(ir, date1904, max_pages, pics, ocr);
+    out.warnings.extend(ir_warnings);
     out.warnings.extend(map_warnings);
-    if ir.metadata.format == DocumentFormat::Xls && has_formulas {
+    if format == DocumentFormat::Xls && has_formulas {
         out.warnings.push(Warning::new(
             WarningKind::FormulaSkipped,
             Level::Info,
