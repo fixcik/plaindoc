@@ -98,6 +98,7 @@ pub(crate) fn parse_in_worker(
         .map_err(|e| error::map_error(e, oo.limits.package_bytes))?;
     let date1904 = doc.as_xlsx().is_some_and(|x| x.workbook.date1904);
     let ir = doc.to_ir();
+    drop(doc); // not needed past the IR: two copies of a large sheet at the peak, not three
     let (mut out, map_warnings) = document_from_ir(&ir, date1904, max_pages, pics, ocr);
     out.warnings.extend(diag::ir_warnings(&ir.metadata));
     out.warnings.extend(map_warnings);
