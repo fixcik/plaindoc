@@ -92,7 +92,7 @@ The OCR build links ONNX Runtime statically from the prebuilt archive that `ort-
 That archive is compiled against glibc 2.38 and the libstdc++ of GCC 13 (symbols such as
 `__isoc23_strtol` and `std::string::_M_replace_cold`), so the link fails on older toolchains and
 the release binaries are built on Ubuntu 24.04. A binary needs at least `GLIBC_2.38`,
-`GLIBCXX_3.4.31` and `CXXABI_1.3.11`: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer.
+`GLIBCXX_3.4.31` and `CXXABI_1.3.11` (x86_64) or `CXXABI_1.3.15` (aarch64): Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer.
 
 On older systems (Ubuntu 22.04, Debian 12, RHEL 9) `cargo build` from source fails the same way:
 it links the same prebuilt archive. What works there:
