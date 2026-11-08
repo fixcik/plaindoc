@@ -273,10 +273,15 @@ pub(crate) fn ocr_warnings(pages: &[&OcrPage], scope: &str, low: f32) -> (Vec<Wa
     };
     let has_text = pages.iter().any(|p| p.has_text(5, 0.8));
     // Pages the orientation check turned (clockwise degrees), named only when there are any.
+    // Several OCRed image regions of one page are numbered; a section is one page already.
     let turned: Vec<String> = pages
         .iter()
-        .filter(|p| p.rotation != 0)
-        .map(|p| format!("{}°", p.rotation))
+        .enumerate()
+        .filter(|(_, p)| p.rotation != 0)
+        .map(|(i, p)| match pages.len() {
+            1 => format!("{}°", p.rotation),
+            _ => format!("{}° (region {})", p.rotation, i + 1),
+        })
         .collect();
     let turned = if turned.is_empty() {
         String::new()
@@ -380,6 +385,16 @@ mod tests {
         assert_eq!(
             w[0].message,
             "OCR (full page): 1 words, mean confidence 0.95; turned by 270°"
+        );
+        let (w, _) = ocr_warnings(
+            &[&page(0.95, "Договор"), &turned],
+            "2 image region(s)",
+            0.75,
+        );
+        assert!(
+            w[0].message.ends_with("; turned by 270° (region 2)"),
+            "{}",
+            w[0].message
         );
         let (w, _) = ocr_warnings(&[&page(0.85, "Договор")], "x", 0.9);
         assert!(

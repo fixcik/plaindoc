@@ -256,3 +256,94 @@ fn single_glyphs_reading_better_upside_down_do_not_turn() {
     } // marker bottom-right: the page reads better upside down
     assert_eq!(ocr_image(&Glyphs, &img, &params()).unwrap().rotation, 0);
 }
+
+/// Upright table with turned column headers (review K1) on landscape rasters: six vertical headers over
+/// six one-glyph cells; portrait rasters (the page turned) show horizontal boxes. A cell reads `cell` as it
+/// stands and `cell_turned` when read along y (a vertical quad over the cell).
+struct Matrix {
+    header: &'static str,
+    cell: f32,
+    cell_turned: f32,
+    detected: AtomicUsize,
+}
+
+fn matrix(header: &'static str, cell: f32, cell_turned: f32) -> Matrix {
+    Matrix {
+        header,
+        cell,
+        cell_turned,
+        detected: AtomicUsize::new(0),
+    }
+}
+
+impl OcrEngine for Matrix {
+    fn detect(&self, img: &Image) -> Result<Vec<TextBox>, OcrError> {
+        self.detected.fetch_add(1, Ordering::Relaxed);
+        let x = |i: usize| 50.0 + 60.0 * i as f32;
+        if img.height() > img.width() {
+            return Ok((0..6)
+                .map(|i| TextBox::from_aabb(50.0, x(i), 450.0, x(i) + 30.0, 0.9))
+                .collect());
+        }
+        let headers = (0..6).map(|i| vbox(x(i), 50.0, x(i) + 30.0, 450.0));
+        let cells = (0..6).map(|i| TextBox::from_aabb(x(i), 470.0, x(i) + 30.0, 490.0, 0.9));
+        Ok(headers.chain(cells).collect())
+    }
+    fn recognize(&self, _img: &Image, b: &[TextBox]) -> Result<Vec<Recognized>, OcrError> {
+        Ok(b.iter()
+            .map(|b| {
+                let [_, y0, _, y1] = b.aabb();
+                match (b.is_vertical(), y1 - y0 > 100.0) {
+                    (true, true) => scripted_recognition(self.header, 0.95),
+                    (true, false) => scripted_recognition("3", self.cell_turned),
+                    _ => scripted_recognition("3", self.cell),
+                }
+            })
+            .collect())
+    }
+}
+
+#[test]
+fn vertical_text_on_an_upright_page_is_not_rotated() {
+    let img = Image::from_pixel(900, 500, image::Rgb([255; 3]));
+    let e = matrix("Соблюдение сроков поставки", 0.95, 0.3);
+    let p = ocr_image(&e, &img, &params()).unwrap();
+    assert_eq!(
+        (p.rotation, p.width),
+        (0, 900),
+        "cells read upright: keep 0°"
+    );
+    assert_eq!(
+        e.detected.load(Ordering::Relaxed),
+        1,
+        "no det on a turned raster"
+    );
+    // Cells that read better turned are fragments of turned text: the page is sideways.
+    let e = matrix("Соблюдение сроков поставки", 0.3, 0.95);
+    assert_eq!(ocr_image(&e, &img, &params()).unwrap().rotation, 90);
+    // Long vertical lines are body text: turned even with upright-looking cells (a page whose table
+    // headers were turned, then the whole page turned).
+    let e = matrix(
+        "Соблюдение сроков поставки товара по договору подряда",
+        0.95,
+        0.3,
+    );
+    assert_eq!(ocr_image(&e, &img, &params()).unwrap().rotation, 90);
+}
+
+#[test]
+fn short_recognition_result_is_an_engine_error() {
+    struct Short;
+    impl OcrEngine for Short {
+        fn detect(&self, _: &Image) -> Result<Vec<TextBox>, OcrError> {
+            Ok((0..3)
+                .map(|i| vbox(50.0 + 60.0 * i as f32, 50.0, 80.0 + 60.0 * i as f32, 450.0))
+                .collect())
+        }
+        fn recognize(&self, _: &Image, _: &[TextBox]) -> Result<Vec<Recognized>, OcrError> {
+            Ok(vec![scripted_recognition("строка", 0.9)])
+        }
+    }
+    let r = ocr_image(&Short, &portrait(), &params());
+    assert!(matches!(r, Err(OcrError::Engine(_))), "{r:?}");
+}

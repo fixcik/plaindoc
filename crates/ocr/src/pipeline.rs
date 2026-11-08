@@ -218,7 +218,12 @@ pub fn ocr_image_cancellable(
                 skew = a;
             }
         }
-        let b = engine.detect(&turned)?;
+        // A deadline passed meanwhile: keep the page as is (no turned boxes, area share 0).
+        let b = if stopped() {
+            Vec::new()
+        } else {
+            engine.detect(&turned)?
+        };
         if orient::area_share(&b, false) >= orient::VERTICAL_SHARE {
             work = Cow::Owned(turned);
             (boxes, page.rotation, page.skew_deg) = (b, rotation, skew);

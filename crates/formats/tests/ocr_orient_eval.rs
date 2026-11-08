@@ -128,27 +128,13 @@ fn sparse_pages_are_not_turned() {
     }
 }
 
-/// One page, MediaBox 612 x 792, `/Rotate rotate`, six Helvetica 14 lines drawn with the text matrix `tm`
-/// from `(x, y)`, each next line at `step` (pt).
-fn rotate_pdf(rotate: u32, tm: &str, (x, y): (f32, f32), step: (f32, f32)) -> Vec<u8> {
-    let lines = [
-        "Payment order number forty two for the delivery of goods",
-        "Recipient bank account and the purpose of the payment",
-        "Total amount due including value added tax and fees",
-        "The invoice is valid for twenty four hours after issue",
-        "Signature of the person responsible for the supplier",
-        "Contract terms and conditions of the public offer apply",
-    ];
-    let mut content = String::new();
-    for (i, l) in lines.iter().enumerate() {
-        let (lx, ly) = (x + step.0 * i as f32, y + step.1 * i as f32);
-        content.push_str(&format!("BT /F1 14 Tf {tm} {lx} {ly} Tm ({l}) Tj ET\n"));
-    }
+/// One-page PDF of `content` in Helvetica `/F1`, MediaBox `[0 0 w h]`, `/Rotate rotate`.
+fn one_page_pdf([w, h]: [u32; 2], rotate: u32, content: &str) -> Vec<u8> {
     let objs = [
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
         format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Rotate {rotate} \
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {w} {h}] /Rotate {rotate} \
              /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"
         ),
         format!(
@@ -176,6 +162,128 @@ fn rotate_pdf(rotate: u32, tm: &str, (x, y): (f32, f32), step: (f32, f32)) -> Ve
         .as_bytes(),
     );
     out
+}
+
+/// Upright evaluation matrix (as the review generator `gen.py`): `cols` ruled columns whose long headers
+/// are turned by 90° (`up`: read bottom-to-top, else top-to-bottom), `rows` rows labelled `P1..` with
+/// one-glyph cells, an optional title. The header area is most of the text box area.
+fn matrix_pdf(
+    landscape: bool,
+    cols: usize,
+    rows: usize,
+    up: bool,
+    title: bool,
+    cell: &[&str],
+) -> Vec<u8> {
+    const HEAD: [&str; 12] = [
+        "Certificate of conformity",
+        "Delivery dates are met",
+        "Packing and labelling quality",
+        "Complete set of documents",
+        "Warranty obligations given",
+        "Meets the technical task",
+        "Timely payment under contract",
+        "No customer complaints filed",
+        "Licence for the activity",
+        "Staff qualification level",
+        "Own warehouse premises",
+        "Experience with similar work",
+    ];
+    let (w, h) = if landscape { (842, 595) } else { (595, 842) };
+    let (top, hh, cw, rh, x0) = (h as f32 - 70.0, 190.0, 34.0, 20.0, 150.0);
+    let mut c = String::new();
+    if title {
+        c.push_str(&format!(
+            "BT /F1 14 Tf 1 0 0 1 50 {} Tm (Supplier evaluation) Tj ET\n",
+            h - 40
+        ));
+    }
+    for i in 0..cols {
+        let x = x0 + cw * i as f32;
+        c.push_str(&format!("{x} {} {cw} {hh} re S\n", top - hh));
+        let (tm, tx, ty) = if up {
+            ("0 1 -1 0", x + 22.0, top - hh + 8.0)
+        } else {
+            ("0 -1 1 0", x + 12.0, top - 8.0)
+        };
+        c.push_str(&format!(
+            "BT /F1 11 Tf {tm} {tx} {ty} Tm ({}) Tj ET\n",
+            HEAD[i % 12]
+        ));
+    }
+    for r in 0..rows {
+        let y = top - hh - rh * (r + 1) as f32;
+        c.push_str(&format!("50 {y} {} {rh} re S\n", x0 - 50.0));
+        c.push_str(&format!(
+            "BT /F1 11 Tf 1 0 0 1 56 {} Tm (P{}) Tj ET\n",
+            y + 6.0,
+            r + 1
+        ));
+        for i in 0..cols {
+            let x = x0 + cw * i as f32;
+            c.push_str(&format!("{x} {y} {cw} {rh} re S\n"));
+            let v = cell[(r * 7 + i * 3) % cell.len()];
+            c.push_str(&format!(
+                "BT /F1 11 Tf 1 0 0 1 {} {} Tm ({v}) Tj ET\n",
+                x + 13.0,
+                y + 6.0
+            ));
+        }
+    }
+    one_page_pdf([w, h], 0, &c)
+}
+
+#[test]
+#[ignore = "needs OCR models"]
+fn upright_matrices_with_turned_headers_are_not_turned() {
+    // Review K1: most of the box area is in vertical headers read confidently one way, yet the page is
+    // upright; the horizontal minority (title, row labels, cells) reads well at 0°, so no turn.
+    let digits = ["1", "2", "3", "4", "5"];
+    let plus = ["+", "-", "+"];
+    for (name, pdf) in [
+        (
+            "landscape, up, plus",
+            matrix_pdf(true, 12, 4, true, true, &plus),
+        ),
+        (
+            "landscape, up, digits",
+            matrix_pdf(true, 12, 6, true, true, &digits),
+        ),
+        (
+            "landscape, down, plus",
+            matrix_pdf(true, 12, 3, false, false, &plus),
+        ),
+        (
+            "portrait, up, plus",
+            matrix_pdf(false, 9, 8, true, true, &plus),
+        ),
+    ] {
+        let img = image::load_from_memory(&render_png(pdf, 0, 200))
+            .unwrap()
+            .to_rgb8();
+        let p = ocr_image(&*engine(), &img, &OcrParams::default()).unwrap();
+        eprintln!("{name}: rotation {} words {}", p.rotation, p.words.len());
+        assert_eq!(p.rotation, 0, "{name}");
+    }
+}
+
+/// One page, MediaBox 612 x 792, `/Rotate rotate`, six Helvetica 14 lines drawn with the text matrix `tm`
+/// from `(x, y)`, each next line at `step` (pt).
+fn rotate_pdf(rotate: u32, tm: &str, (x, y): (f32, f32), step: (f32, f32)) -> Vec<u8> {
+    let lines = [
+        "Payment order number forty two for the delivery of goods",
+        "Recipient bank account and the purpose of the payment",
+        "Total amount due including value added tax and fees",
+        "The invoice is valid for twenty four hours after issue",
+        "Signature of the person responsible for the supplier",
+        "Contract terms and conditions of the public offer apply",
+    ];
+    let mut content = String::new();
+    for (i, l) in lines.iter().enumerate() {
+        let (lx, ly) = (x + step.0 * i as f32, y + step.1 * i as f32);
+        content.push_str(&format!("BT /F1 14 Tf {tm} {lx} {ly} Tm ({l}) Tj ET\n"));
+    }
+    one_page_pdf([612, 792], rotate, &content)
 }
 
 #[test]
@@ -221,4 +329,60 @@ fn rotate_entry_and_orientation_check_do_not_turn_twice() {
             "OCR words land on the layer words: {ws:?}"
         );
     }
+}
+
+/// Resident set size of this process, KiB (`ps`).
+fn rss_kib() -> u64 {
+    let out = std::process::Command::new("ps")
+        .args(["-o", "rss=", "-p", &std::process::id().to_string()])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse()
+        .unwrap_or(0)
+}
+
+#[test]
+#[ignore = "needs ORIENT_MEM_SET (a directory of page images) and OCR models"]
+fn service_mode_memory_reaches_a_plateau() {
+    // One engine for the whole run, as a long-lived service: portrait, landscape and turned pages mixed
+    // (the directory order). RSS after each page; the peak must stop growing with new raster shapes.
+    let dir = std::path::PathBuf::from(std::env::var_os("ORIENT_MEM_SET").expect("ORIENT_MEM_SET"));
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    files.sort();
+    let e = engine();
+    let mut peak = Vec::new();
+    for (i, f) in files.iter().enumerate() {
+        let img = image::ImageReader::open(f)
+            .unwrap()
+            .with_guessed_format()
+            .unwrap()
+            .decode()
+            .unwrap()
+            .to_rgb8();
+        let p = ocr_image(&*e, &img, &OcrParams::default()).unwrap();
+        let rss = rss_kib() / 1024;
+        peak.push(rss);
+        eprintln!(
+            "{i:3} {:?} {}x{} rotation {} rss {rss} MB",
+            f.file_name().unwrap(),
+            img.width(),
+            img.height(),
+            p.rotation
+        );
+    }
+    let half = peak.len() / 2;
+    let (a, b) = (
+        peak[..half].iter().max().unwrap(),
+        peak[half..].iter().max().unwrap(),
+    );
+    eprintln!("peak first half {a} MB, second half {b} MB");
+    assert!(
+        *b as f64 <= *a as f64 * 1.1,
+        "RSS keeps growing: {a} -> {b} MB"
+    );
 }
