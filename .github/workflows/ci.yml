@@ -32,6 +32,8 @@ jobs:
       # by build.rs when missing; macOS keeps them under a path with a space, not cached.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
+          # A failed run keeps its cache too: the build is the slow part, not the test that failed.
+          cache-on-failure: true
           cache-directories: |
             ~/.cache/ort.pyke.io
             ~/.local/share/plaindoc/models
@@ -74,6 +76,8 @@ jobs:
           rustup default 1.92.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
+          # A failed run keeps its cache too: the build is the slow part, not the test that failed.
+          cache-on-failure: true
           cache-directories: |
             ~/.cache/ort.pyke.io
             ~/Library/Caches/ort.pyke.io
