@@ -236,7 +236,7 @@ fn matrix_pdf(
 #[test]
 #[ignore = "needs OCR models"]
 fn upright_matrices_with_turned_headers_are_not_turned() {
-    // Review K1: most of the box area is in vertical headers read confidently one way, yet the page is
+    // most of the box area is in vertical headers read confidently one way, yet the page is
     // upright; the horizontal minority (title, row labels, cells) reads well at 0°, so no turn.
     let digits = ["1", "2", "3", "4", "5"];
     let plus = ["+", "-", "+"];

@@ -142,7 +142,7 @@ pub(crate) fn sideways(
         return Ok(None);
     }
     // Long vertical lines are body text: the page is sideways. Short ones may be turned column headers of
-    // an upright table (review K1): then the horizontal minority decides.
+    // an upright table: then the horizontal minority decides.
     let body = reads
         .iter()
         .filter(|r| r.conf >= VOTE_CONF && chars(r) >= BODY_CHARS)

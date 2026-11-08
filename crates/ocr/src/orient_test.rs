@@ -257,7 +257,7 @@ fn single_glyphs_reading_better_upside_down_do_not_turn() {
     assert_eq!(ocr_image(&Glyphs, &img, &params()).unwrap().rotation, 0);
 }
 
-/// Upright table with turned column headers (review K1) on landscape rasters: six vertical headers over
+/// Upright table with turned column headers on landscape rasters: six vertical headers over
 /// six one-glyph cells; portrait rasters (the page turned) show horizontal boxes. A cell reads `cell` as it
 /// stands and `cell_turned` when read along y (a vertical quad over the cell).
 struct Matrix {
