@@ -26,7 +26,8 @@ const VOTE_CONF: f32 = 0.6;
 const VOTE_SHARE: f32 = 0.8;
 const VOTE_CHARS: usize = 12;
 /// At least `BODY_LINES` vote readings of `BODY_CHARS` chars are body text, not turned column headers (the
-/// headers of the review matrices are 27-39 chars; 95 % of the sideways eval pages have two longer lines).
+/// headers of the test matrices are 20-32 chars without spaces; 95 % of the sideways eval pages have two longer
+/// lines). Counted without spaces, like the vote; a page with two turned headers of 40+ chars still turns.
 const BODY_CHARS: usize = 40;
 const BODY_LINES: usize = 2;
 /// Horizontal boxes needed to judge the minority of a vertical page.
