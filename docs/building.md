@@ -85,3 +85,20 @@ notes generated from the commits. Running the workflow by hand (`workflow_dispat
 same steps but publishes nothing; the archives are kept as workflow artifacts.
 
 There is no `x86_64-apple-darwin` build: the ONNX Runtime prebuilts used by `ort` do not cover it.
+
+## Linux requirements
+
+The OCR build links ONNX Runtime statically from the prebuilt archive that `ort-sys` downloads.
+That archive is compiled against glibc 2.38 and the libstdc++ of GCC 13 (symbols such as
+`__isoc23_strtol` and `std::string::_M_replace_cold`), so the link fails on older toolchains and
+the release binaries are built on Ubuntu 24.04. A binary needs at least `GLIBC_2.38`,
+`GLIBCXX_3.4.31` and `CXXABI_1.3.11`: Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or newer.
+
+On older systems (Ubuntu 22.04, Debian 12, RHEL 9) `cargo build` from source fails the same way:
+it links the same prebuilt archive. What works there:
+
+- `cargo build --release -p plaindoc-cli --no-default-features`: everything except OCR (scanned
+  pages come out empty). It does not use ONNX Runtime.
+- An ONNX Runtime 1.28 built from source on that system as static libraries, passed to `ort-sys`
+  through `ORT_LIB_LOCATION` (see the `ort` documentation on linking). This is not tested here.
+- Running the release binary in a container with a newer distribution.

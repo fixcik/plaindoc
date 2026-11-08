@@ -20,7 +20,9 @@ plaindoc parse --help                        # OCR mode, hidden text, page separ
 ```
 
 Prebuilt binaries for macOS (Apple silicon), Linux (x86_64, aarch64) and Windows (x86_64), with
-the OCR models embedded: [GitHub Releases](https://github.com/fixcik/plaindoc/releases).
+the OCR models embedded: [GitHub Releases](https://github.com/fixcik/plaindoc/releases). The Linux
+binaries need glibc 2.38+ and libstdc++ from GCC 13+ (Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10
+or newer); for older systems see [docs/building.md](docs/building.md#linux-requirements).
 
 ## Compared with Docling
 

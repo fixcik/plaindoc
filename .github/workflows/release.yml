@@ -66,8 +66,10 @@ jobs:
               if ldd "$bin" | grep -vE '(linux-vdso|ld-linux|lib(c|m|dl|rt|pthread|gcc_s|stdc\+\+)\.so)'; then
                 echo "::error::unexpected shared library"; exit 1
               fi
-              echo "highest symbol versions:"
-              objdump -T "$bin" | grep -oE '(GLIBC|GLIBCXX|CXXABI)_[0-9.]+' | sort -uV | tail -n 6 ;;
+              echo "highest symbol versions (the minimum on the user's system):"
+              for v in GLIBC GLIBCXX CXXABI; do
+                objdump -T "$bin" | grep -oE "${v}_[0-9.]+" | sort -uV | tail -n 1 || true
+              done ;;
             Windows)
               ldd "$bin.exe" || true ;;
           esac
