@@ -19,6 +19,9 @@ plaindoc parse scans/ -f json -o out/ -j 8   # a directory, 8 files in parallel
 plaindoc parse --help                        # OCR mode, hidden text, page separators, stats
 ```
 
+Prebuilt binaries for macOS (Apple silicon), Linux (x86_64, aarch64) and Windows (x86_64), with
+the OCR models embedded: [GitHub Releases](https://github.com/fixcik/plaindoc/releases).
+
 ## Compared with Docling
 
 - On small text PDFs roughly 60–200× faster (informal spot check on 23 one- and two-page PDFs, Apple silicon; not a benchmark): 0.112 s for all 23 files on one thread, 0.036 s on all cores, against 7.2 s of conversion time for Docling 2.148 with default settings (plus about 5 s of start-up and model loading).

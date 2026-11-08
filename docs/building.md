@@ -71,3 +71,17 @@ document then carries an `OcrUnavailable` warning at level `warn`, which is prin
 embedded in Markdown. The warning says that the OCR models are missing and how to provide them.
 The exit code is unchanged, but with `--strict --min-quality` it can change: a docx/pptx with
 pictures on a model-less binary drops from quality 1.0 to 0.9.
+
+## Releases
+
+1. Set `version` in `[workspace.package]` of `Cargo.toml` and commit.
+2. Tag the commit `vX.Y.Z` (the same version) and push the tag: `git push origin vX.Y.Z`.
+
+`.github/workflows/release.yml` checks that the tag matches the version, builds `plaindoc` with
+`PLAINDOC_REQUIRE_MODELS=1` for each target, checks that the binary has no non-system dynamic
+dependencies, and runs a smoke test with an empty user models dir. It then packs the binary with
+`scripts/package-release.sh` and creates a GitHub Release with the archives, `SHA256SUMS` and
+notes generated from the commits. Running the workflow by hand (`workflow_dispatch`) does the
+same steps but publishes nothing; the archives are kept as workflow artifacts.
+
+There is no `x86_64-apple-darwin` build: the ONNX Runtime prebuilts used by `ort` do not cover it.

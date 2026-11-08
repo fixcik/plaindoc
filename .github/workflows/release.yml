@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Manual run: builds, checks and uploads the archives as workflow artifacts, publishes nothing.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  PLAINDOC_REQUIRE_MODELS: "1"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-15 }
+          # Old glibc on purpose: the binary runs on glibc >= the runner's.
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: x86_64-pc-windows-msvc, os: windows-2022 }
+          # x86_64-apple-darwin is not built: ort-sys 2.0.0-rc.13 (ONNX Runtime 1.28) has no
+          # prebuilt static ONNX Runtime for it (see its build/download/dist.tsv).
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Keep LF line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - name: Install Rust
+        run: |
+          rustup toolchain install 1.92.0 --profile minimal --target ${{ matrix.target }}
+          rustup default 1.92.0
+      - name: Check that the tag matches the version
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "plaindoc-cli") | .version')
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
+            exit 1
+          fi
+      - name: Build
+        run: cargo build --release -p plaindoc-cli --locked --target ${{ matrix.target }}
+      - name: Check dynamic dependencies
+        run: |
+          bin=target/${{ matrix.target }}/release/plaindoc
+          case "${{ runner.os }}" in
+            macOS)
+              otool -L "$bin"
+              if otool -L "$bin" | tail -n +2 | grep -vE '^[[:space:]]+(/System/Library/|/usr/lib/)'; then
+                echo "::error::non-system dylib linked"; exit 1
+              fi ;;
+            Linux)
+              ldd "$bin"
+              if ldd "$bin" | grep -vE '(linux-vdso|ld-linux|lib(c|m|dl|rt|pthread|gcc_s|stdc\+\+)\.so)'; then
+                echo "::error::unexpected shared library"; exit 1
+              fi
+              echo "highest symbol versions:"
+              objdump -T "$bin" | grep -oE '(GLIBC|GLIBCXX|CXXABI)_[0-9.]+' | sort -uV | tail -n 6 ;;
+            Windows)
+              ldd "$bin.exe" || true ;;
+          esac
+      - name: Smoke test
+        run: |
+          bin=target/${{ matrix.target }}/release/plaindoc
+          fixtures=crates/formats/tests/fixtures/pdf
+          # Empty user models dir: the models must come from the binary itself.
+          empty=$(mktemp -d)
+          if command -v cygpath >/dev/null; then empty=$(cygpath -w "$empty"); fi
+          export HOME="$empty" XDG_DATA_HOME="$empty" LOCALAPPDATA="$empty"
+          "$bin" --version
+          "$bin" --help >/dev/null
+          "$bin" models list | tee models.txt
+          [ "$(grep -c 'bundled' models.txt)" -eq 2 ] || { echo "::error::OCR models not embedded"; exit 1; }
+          "$bin" parse "$fixtures/notes.pdf" | grep -F 'Chapter 1'
+          "$bin" parse --ocr auto "$fixtures/scan.pdf" | grep -F 'Договор поставки'
+      - name: Package
+        run: scripts/package-release.sh ${{ matrix.target }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plaindoc-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: plaindoc-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum plaindoc-* | tee SHA256SUMS
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" --title "plaindoc $GITHUB_REF_NAME" --generate-notes
