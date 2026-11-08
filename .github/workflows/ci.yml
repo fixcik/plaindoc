@@ -54,6 +54,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    # Windows runs the tests only on a manual dispatch: the OCR tests take over 30 minutes there.
+    # The release workflow still builds and smoke-tests the Windows binary.
+    if: matrix.os != 'windows-latest' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     env:
       # Every test binary links the static ONNX Runtime; full debug info filled the Linux
