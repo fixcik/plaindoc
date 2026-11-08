@@ -262,6 +262,9 @@ fn rotated_page_merge_has_no_duplicates() {
         ..Default::default()
     };
     c.ocr.params.deskew = false; // a single short line: skew estimate is undefined
+    // One 12 pt word on the page sits right at the blank-page rule (edge density 0.00036 against
+    // 0.0003 with macOS Helvetica); a substitute font, such as Arial on Windows, tips it to blank.
+    c.ocr.params.blank_check = false;
     let p = parse_opened(
         opened(rotated_offset_pdf()),
         &opts(OcrMode::Always),
