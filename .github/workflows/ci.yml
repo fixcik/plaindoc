@@ -70,4 +70,4 @@ jobs:
             ~/AppData/Local/ort.pyke.io
             ~/.local/share/plaindoc/models
             ~/AppData/Local/plaindoc/models
-      - run: cargo test --workspace --all-features --locked
+      - run: cargo test --workspace --all-features --locked --no-fail-fast
