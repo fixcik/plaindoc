@@ -175,7 +175,9 @@ mod tests {
             Err(OcrError::ModelsUnavailable(m)) => m,
             other => panic!("{other:?}"),
         };
-        assert!(err(load_model(&TINY, Some(d.path()))).contains("tiny/inference.onnx"));
+        // The platform separator: `tiny\inference.onnx` on Windows.
+        let named = Path::new("tiny").join("inference.onnx");
+        assert!(err(load_model(&TINY, Some(d.path()))).contains(&*named.to_string_lossy()));
         assert!(err(load_model(&TINY, None)).contains("not bundled"));
         std::fs::create_dir(d.path().join("tiny")).unwrap();
         std::fs::write(d.path().join("tiny/inference.onnx"), b"abd").unwrap();
