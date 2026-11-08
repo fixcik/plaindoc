@@ -54,6 +54,12 @@ pub struct ParseOptions {
     pub quality: QualityWeights,
     /// Page-level parallelism inside one document; `parse_many` sets false.
     pub page_parallel: bool,
+    /// With `page_parallel` on: at most this many pages of one PDF are parsed at once (PDFs of
+    /// at least `PdfConfig::min_parallel_pages` pages, 32 by default; smaller ones go page by
+    /// page). `None`: the library default, min(cores, 6). `Some(0)` counts as `Some(1)`: pages
+    /// one by one. The output does not depend on it. Pages that need OCR are bounded by the OCR
+    /// engine's session count instead.
+    pub page_threads: Option<usize>,
     /// Input larger than this is not treated as text and yields `ParseError::TooLarge`
     /// (compared against input size, not extracted text).
     pub max_text_bytes: u64,
@@ -87,6 +93,7 @@ impl Default for ParseOptions {
             libreoffice_fallback: false,
             quality: QualityWeights::default(),
             page_parallel: false,
+            page_threads: None,
             max_text_bytes: 64 * 1024 * 1024,
             ocr_max_pages: None,
             ocr_page_timeout: None,

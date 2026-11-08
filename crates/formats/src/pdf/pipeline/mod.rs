@@ -11,7 +11,6 @@ use plaindoc_core::{
     Document, HiddenText, Level, LimitKind, ParseError, ParseOptions, ParseStats, Result, Section,
     SectionKind, Stage, Warning, WarningKind, apply_quality,
 };
-use rayon::prelude::*;
 
 use super::PdfConfig;
 #[cfg(not(feature = "ocr"))]
@@ -35,6 +34,8 @@ use super::table_place::{place_tables, strip_table_text};
 use super::tables::{DetectedTable, TableInputCounts, continues};
 use crate::tables::{InputPath, InputWord};
 
+mod pages;
+use pages::{page_workers, par_pages};
 mod stage_a;
 use stage_a::stage_a;
 #[cfg(feature = "ocr")]
@@ -190,7 +191,13 @@ pub(crate) fn parse_opened(
     let (layers, ocgs_took) = timed(Stage::Text, || layer_filter(doc, opts.hidden_text));
     // Stage A: page 0 warms up shared document caches, then the rest.
     let cancel = &*ctx.cancel;
-    let parallel = ctx.page_parallel_allowed && opts.page_parallel && n >= cfg.min_parallel_pages;
+    let workers = if ctx.page_parallel_allowed && opts.page_parallel && n >= cfg.min_parallel_pages
+    {
+        page_workers(opts.page_threads, n - 1)
+    } else {
+        1
+    };
+    let parallel = workers > 1;
     let parent = telemetry::Span::current();
     let page_a = |p: usize| {
         in_page(&parent, p, || {
@@ -202,10 +209,7 @@ pub(crate) fn parse_opened(
         raw.push(page_a(0)?);
     }
     let rest: Vec<RawPage> = if parallel {
-        (1..n)
-            .into_par_iter()
-            .map(page_a)
-            .collect::<Result<Vec<_>>>()?
+        par_pages(1..n, workers, page_a)?
     } else {
         (1..n).map(page_a).collect::<Result<Vec<_>>>()?
     };

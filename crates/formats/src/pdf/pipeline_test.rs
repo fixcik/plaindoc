@@ -370,6 +370,35 @@ fn detector_counts_are_summed_in_page_order() {
     );
 }
 
+#[test]
+fn page_threads_do_not_change_the_document() {
+    let run = |on: bool, threads: Option<usize>| {
+        let mut o = par_opts(on);
+        o.page_threads = threads;
+        let p = parse_opened(
+            opened(builder_pdf_bytes(40)),
+            &o,
+            &PdfConfig::default(),
+            &ctx(true),
+        )
+        .unwrap();
+        (p.document.to_json(), p.stats.page_parallel)
+    };
+    let (seq, ran) = run(false, None);
+    assert!(!ran);
+    for (threads, parallel) in [
+        (None, true),
+        (Some(2), true),
+        (Some(64), true),
+        (Some(1), false),
+        (Some(0), false),
+    ] {
+        let (doc, ran) = run(true, threads);
+        assert_eq!(ran, parallel, "{threads:?}");
+        assert_eq!(doc, seq, "{threads:?}");
+    }
+}
+
 #[cfg(feature = "ocr")]
 #[path = "pipeline_ocr_test.rs"]
 mod ocr;

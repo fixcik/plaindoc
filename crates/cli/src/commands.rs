@@ -136,6 +136,7 @@ fn options(args: &ParseArgs) -> ParseOptions {
         HiddenArg::Strip => HiddenText::Strip,
     };
     opts.min_quality = args.min_quality;
+    opts.page_threads = args.page_threads.map(usize::from);
     opts.links = !args.no_links;
     opts.images.enabled = !args.no_images;
     // Without -o the pictures are only named, their bytes are not kept.
@@ -507,6 +508,28 @@ mod tests {
             got.iter()
                 .all(|(r, _, w)| w.is_ok() && r.as_ref().unwrap().images.is_empty())
         );
+    }
+
+    #[test]
+    fn page_threads_flag_reaches_options() {
+        use clap::Parser;
+        let opts = |extra: &[&str]| {
+            let mut argv = vec!["plaindoc", "parse", "a.pdf"];
+            argv.extend_from_slice(extra);
+            match Cli::try_parse_from(argv).map(|c| c.cmd) {
+                Ok(Cmd::Parse(a)) => Ok(options(&a).page_threads),
+                Ok(_) => unreachable!(),
+                Err(e) => Err(e.kind()),
+            }
+        };
+        assert_eq!(opts(&[]), Ok(None));
+        assert_eq!(opts(&["--page-threads", "1"]), Ok(Some(1)));
+        assert_eq!(opts(&["--page-threads", "6"]), Ok(Some(6)));
+        assert_eq!(
+            opts(&["--page-threads", "0"]),
+            Err(clap::error::ErrorKind::ValueValidation)
+        );
+        assert!(opts(&["--page-threads", "x"]).is_err());
     }
 
     #[test]

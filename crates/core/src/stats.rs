@@ -212,7 +212,8 @@ pub struct ParseStats {
     pub wall_us: u64,
     /// Busy time per stage summed over pages; with page parallelism it can exceed `wall_us`.
     pub stages_us: BTreeMap<Stage, u64>,
-    /// Pages of the document were processed in parallel.
+    /// Pages of the document went through text extraction on more than one worker
+    /// (`ParseOptions::page_threads`); pages that need OCR follow the OCR session count.
     pub page_parallel: bool,
     pub pages: PageCounts,
     pub limits: BTreeMap<LimitKind, u32>,

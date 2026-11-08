@@ -65,6 +65,11 @@ pub struct ParseArgs {
     /// Number of files parsed in parallel (0 = rayon default).
     #[arg(short = 'j', long = "jobs", value_name = "N")]
     pub jobs: Option<usize>,
+    /// Pages of one PDF parsed at once (default: min(cores, 6)); only for a single input file,
+    /// several files run in parallel (-j) with each file's pages one by one. Pages that need OCR
+    /// are bounded by --ocr-threads instead.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u16).range(1..))]
+    pub page_threads: Option<u16>,
     /// Quality threshold (0..=1) for --strict.
     #[arg(long, value_name = "X", value_parser = parse_quality)]
     pub min_quality: Option<f32>,

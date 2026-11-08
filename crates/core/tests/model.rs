@@ -57,6 +57,7 @@ fn parse_options_default_and_field_update() {
     assert_eq!(o.ocr, OcrMode::Auto);
     assert!(o.timeout.is_none() && o.max_size.is_none() && o.min_quality.is_none());
     assert!(!o.libreoffice_fallback && !o.page_parallel);
+    assert_eq!(o.page_threads, None);
     assert_eq!(o.max_text_bytes, 64 * 1024 * 1024);
     o.ocr = OcrMode::Never;
     o.max_size = Some(10);
