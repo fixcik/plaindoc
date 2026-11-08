@@ -83,52 +83,52 @@ fn page_input_with(doc: &PdfDocument, page: usize, spike: bool) -> Result<PageIn
     let (width, height) = (f64::from(mb.2 - mb.0), f64::from(mb.3 - mb.1));
     // Page-local coordinates: x from the left edge, top-down y from the top edge of the MediaBox.
     let (ox, top_y) = page_origin(doc, page);
-    let words = doc.extract_words(page).map_err(engine)?;
+    // Shared with `classify_page`: read in place, only the rotated glyphs (merged below) are copied.
+    let words = doc.extract_words_shared(page).map_err(engine)?;
     if words.len() > ADAPTER_MAX_WORDS {
         return Err(limit("words on the page", words.len(), ADAPTER_MAX_WORDS));
     }
-    let words = if spike {
-        words
-    } else {
-        merge_rotated_runs(words)
+    let input_word = |w: &pdf_oxide::layout::Word| {
+        let (x, y, ww, wh) = (
+            f64::from(w.bbox.x),
+            f64::from(w.bbox.y),
+            f64::from(w.bbox.width),
+            f64::from(w.bbox.height),
+        );
+        let char_x = if w.chars.len() == w.text.chars().count() {
+            w.chars
+                .iter()
+                .map(|c| {
+                    (
+                        f64::from(c.bbox.x) - ox,
+                        f64::from(c.bbox.x + c.bbox.width) - ox,
+                    )
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        InputWord {
+            rect: Rect::new(x - ox, top_y - (y + wh), ww, wh),
+            text: w.text.clone(),
+            font_size: f64::from(w.avg_font_size),
+            char_x,
+            rotated: !spike && w.rotation_degrees != 0.0,
+        }
     };
-    let words = words
-        .into_iter()
-        .map(|w| {
-            let (x, y, ww, wh) = (
-                f64::from(w.bbox.x),
-                f64::from(w.bbox.y),
-                f64::from(w.bbox.width),
-                f64::from(w.bbox.height),
-            );
-            let char_x = if w.chars.len() == w.text.chars().count() {
-                w.chars
-                    .iter()
-                    .map(|c| {
-                        (
-                            f64::from(c.bbox.x) - ox,
-                            f64::from(c.bbox.x + c.bbox.width) - ox,
-                        )
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
-            InputWord {
-                rect: Rect::new(x - ox, top_y - (y + wh), ww, wh),
-                text: w.text,
-                font_size: f64::from(w.avg_font_size),
-                char_x,
-                rotated: !spike && w.rotation_degrees != 0.0,
-            }
-        })
-        .collect();
+    // Order of `merge_rotated_runs` on the whole list: upright words in content order, then the runs.
+    let (upright, rotated): (Vec<_>, Vec<_>) = words
+        .iter()
+        .partition(|w| spike || w.rotation_degrees == 0.0);
+    let mut words: Vec<InputWord> = upright.into_iter().map(input_word).collect();
+    let rotated = rotated.into_iter().cloned().collect();
+    words.extend(merge_rotated_runs(rotated).iter().map(input_word));
     let (mut paths, mut segments) = (Vec::new(), Vec::new());
     // Counted before expanding (a stroked `re` is 4 segments): over the cap the page is skipped before the
     // copies are made (SP4 final review I-3).
     let mut prims = 0usize;
     for q in doc
-        .extract_paths(page)
+        .extract_paths_shared(page)
         .map_err(engine)?
         .iter()
         .filter(|q| q.is_table_primitive())

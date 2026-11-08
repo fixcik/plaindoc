@@ -65,12 +65,15 @@ pub(crate) fn span_boxes_px(
     p: usize,
     geom: &PageGeom,
 ) -> Result<Vec<[f32; 4]>, String> {
-    layer_boxes(doc.extract_spans(p), geom)
+    layer_boxes(
+        doc.extract_spans_shared(p).as_ref().map(|s| s.as_slice()),
+        geom,
+    )
 }
 
 /// A failed extraction stays an error: as an empty layer it would disable merge dedup.
 fn layer_boxes(
-    spans: pdf_oxide::Result<Vec<pdf_oxide::layout::TextSpan>>,
+    spans: Result<&[pdf_oxide::layout::TextSpan], &pdf_oxide::Error>,
     geom: &PageGeom,
 ) -> Result<Vec<[f32; 4]>, String> {
     Ok(spans

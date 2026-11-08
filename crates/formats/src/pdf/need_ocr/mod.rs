@@ -285,7 +285,7 @@ pub(crate) fn classifier_text(doc: &PdfDocument, p: usize, page: &StructuredPage
         .join("\n");
     const R: char = '\u{FFFD}';
     let in_chars = doc
-        .extract_chars(p)
+        .extract_chars_shared(p)
         .map(|v| v.iter().filter(|c| c.char == R).count())
         .unwrap_or(0);
     let lost = in_chars.saturating_sub(text.chars().filter(|c| *c == R).count());

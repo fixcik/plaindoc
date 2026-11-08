@@ -184,6 +184,15 @@ pub(super) fn stage_a(
         };
         run.then_some(decision)
     };
+    // Done with this page's extractions: its entries leave the document's per-page caches, which
+    // then hold only the pages in flight (OCR pages keep theirs for the OCR pass).
+    #[cfg(feature = "ocr")]
+    let keep = ocr_want.is_some();
+    #[cfg(not(feature = "ocr"))]
+    let keep = false;
+    if !keep {
+        doc.forget_page(p);
+    }
     Ok(RawPage {
         structured,
         classify,

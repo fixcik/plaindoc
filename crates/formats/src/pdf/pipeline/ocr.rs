@@ -85,6 +85,10 @@ pub(super) fn ocr_pass(
             raw[p].ocr_counts = c;
         }
     }
+    // Stage A kept the per-page caches of the wanted pages for this pass; nothing reads them later.
+    for &(p, _) in &want {
+        doc.forget_page(p);
+    }
     Ok(OcrPass {
         done: todo.len(),
         wanted: want.len(),

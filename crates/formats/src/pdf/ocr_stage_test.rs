@@ -149,12 +149,9 @@ fn cropped_page_spans_hit_the_ink() {
 fn span_extraction_error_is_an_error_not_an_empty_layer() {
     // An empty layer would disable dedup on the merge path and duplicate the layer's text.
     let geom = PageGeom::image(100, 100);
-    let r = layer_boxes(Err(pdf_oxide::Error::InvalidHeader("x".into())), &geom);
+    let r = layer_boxes(Err(&pdf_oxide::Error::InvalidHeader("x".into())), &geom);
     assert!(r.is_err(), "{r:?}");
-    assert_eq!(
-        layer_boxes(Ok(Vec::new()), &geom).unwrap(),
-        Vec::<[f32; 4]>::new()
-    );
+    assert_eq!(layer_boxes(Ok(&[]), &geom).unwrap(), Vec::<[f32; 4]>::new());
 }
 
 #[test]

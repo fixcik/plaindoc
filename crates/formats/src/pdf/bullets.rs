@@ -40,12 +40,12 @@ pub(crate) fn bullet_boxes(doc: &PdfDocument, page: usize) -> Vec<Bullet> {
 fn bullet_boxes_within(doc: &PdfDocument, page: usize, max_bytes: usize) -> Vec<Bullet> {
     // the size check comes before the path parser builds anything
     if doc
-        .get_page_content_data(page)
+        .get_page_content_data_shared(page)
         .map_or(true, |d| d.len() > max_bytes)
     {
         return Vec::new();
     }
-    let Ok(paths) = doc.extract_paths(page) else {
+    let Ok(paths) = doc.extract_paths_shared(page) else {
         return Vec::new();
     };
     if paths.len() > MAX_PATHS {
