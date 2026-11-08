@@ -40,8 +40,9 @@ enum Emit {
     Failed(io::ErrorKind),
 }
 
-fn emit<W: Write>(w: &mut W, text: &str) -> Emit {
-    match w.write_all(text.as_bytes()).and_then(|()| w.flush()) {
+/// Runs `write` on `w`, then flushes it.
+fn emit<W: Write>(w: &mut W, write: impl FnOnce(&mut W) -> io::Result<()>) -> Emit {
+    match write(w).and_then(|()| w.flush()) {
         Ok(()) => Emit::Done,
         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Emit::Closed,
         Err(e) => Emit::Failed(e.kind()),
@@ -51,7 +52,15 @@ fn emit<W: Write>(w: &mut W, text: &str) -> Emit {
 /// Writes `text` to stdout; returns `false` when output should stop.
 /// A write error (other than a closed pipe) is reported and sets `failed`.
 fn print(text: &str, failed: &mut bool) -> bool {
-    match emit(&mut io::stdout().lock(), text) {
+    print_with(|w| w.write_all(text.as_bytes()), failed)
+}
+
+/// As [`print`], with the output written by `write` into buffered stdout.
+fn print_with(
+    write: impl FnOnce(&mut io::BufWriter<io::StdoutLock<'static>>) -> io::Result<()>,
+    failed: &mut bool,
+) -> bool {
+    match emit(&mut io::BufWriter::new(io::stdout().lock()), write) {
         Emit::Done => true,
         Emit::Closed => false,
         Emit::Failed(kind) => {
@@ -144,10 +153,18 @@ fn options(args: &ParseArgs) -> ParseOptions {
     opts
 }
 
-/// `image_dir`: the pictures' directory relative to the output file.
-fn render(doc: &Document, args: &ParseArgs, image_dir: Option<String>) -> String {
+/// Writes `doc` into `out`; `image_dir`: the pictures' directory relative to the output file.
+fn render(
+    doc: &Document,
+    args: &ParseArgs,
+    image_dir: Option<String>,
+    out: &mut impl Write,
+) -> io::Result<()> {
     match args.format {
-        OutFormat::Json => doc.to_json() + "\n",
+        OutFormat::Json => {
+            doc.write_json(out)?;
+            out.write_all(b"\n")
+        }
         OutFormat::Markdown => {
             let mut o = MarkdownOptions::default();
             o.warnings = !args.no_warnings;
@@ -158,7 +175,7 @@ fn render(doc: &Document, args: &ParseArgs, image_dir: Option<String>) -> String
                 PageSeparatorArg::None => PageSeparator::None,
             };
             o.image_dir = image_dir;
-            doc.to_markdown_with(&o)
+            doc.write_markdown_with(&o, out)
         }
     }
 }
@@ -375,7 +392,7 @@ fn parse(registry: &Registry, args: ParseArgs) -> u8 {
         low |= args.min_quality.is_some_and(|m| doc.quality < m);
         match &outs {
             None => {
-                if !print(&render(&doc, &args, None), &mut failed) {
+                if !print_with(|w| render(&doc, &args, None, w), &mut failed) {
                     break;
                 }
             }
@@ -386,11 +403,15 @@ fn parse(registry: &Registry, args: ParseArgs) -> u8 {
                     Ok(d) => (d, Ok(())),
                     Err(e) => (None, Err(e)),
                 };
-                let text = render(&doc, &args, dir);
                 let written = target
                     .parent()
                     .map_or(Ok(()), std::fs::create_dir_all)
-                    .and_then(|()| std::fs::write(target, text))
+                    .and_then(|()| std::fs::File::create(target))
+                    .and_then(|f| {
+                        let mut w = io::BufWriter::new(f);
+                        render(&doc, &args, dir, &mut w)?;
+                        w.flush()
+                    })
                     .and(pics);
                 match written {
                     Ok(()) => elog!("{} -> {}", path.display(), target.display()),
@@ -534,15 +555,16 @@ mod tests {
 
     #[test]
     fn emit_classifies_write_results() {
+        let x = |w: &mut Failing| w.write_all(b"x");
         let mut ok = Vec::new();
-        assert_eq!(emit(&mut ok, "hi"), Emit::Done);
+        assert_eq!(emit(&mut ok, |w| w.write_all(b"hi")), Emit::Done);
         assert_eq!(ok, b"hi");
         assert_eq!(
-            emit(&mut Failing(io::ErrorKind::BrokenPipe), "x"),
+            emit(&mut Failing(io::ErrorKind::BrokenPipe), x),
             Emit::Closed
         );
         assert_eq!(
-            emit(&mut Failing(io::ErrorKind::StorageFull), "x"),
+            emit(&mut Failing(io::ErrorKind::StorageFull), x),
             Emit::Failed(io::ErrorKind::StorageFull)
         );
     }

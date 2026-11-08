@@ -356,3 +356,30 @@ fn batch_output_never_overwrites_an_input_file() {
     );
     assert!(d.path().join("a.txt~2.md").exists());
 }
+
+#[test]
+fn closed_stdout_stops_quietly() {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    let d = tempfile::tempdir().unwrap();
+    let body: String = (0..100_000).map(|i| format!("{i},cell {i}\n")).collect();
+    let p = write(d.path(), "big.csv", &body);
+    for format in ["markdown", "json"] {
+        let mut child = Command::new(assert_cmd::cargo::cargo_bin!("plaindoc"))
+            .args(["parse", "-f", format])
+            .arg(&p)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut head = [0u8; 100];
+        child.stdout.take().unwrap().read_exact(&mut head).unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(out.status.success(), "{format}: {:?}", out.status);
+        assert!(
+            out.stderr.is_empty(),
+            "{format}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
