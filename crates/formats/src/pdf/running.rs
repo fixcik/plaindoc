@@ -167,7 +167,7 @@ fn propagate(cands: &[Vec<Cand>], heights: &[f32], found: &mut [HashSet<usize>],
         f.sort_unstable();
         let mut texts: HashSet<String> = HashSet::new();
         for ci in f {
-            let t = norm(&cands[i][ci].text);
+            let t = cands[i][ci].key.norm.clone();
             let e = lines.entry(t.clone()).or_default();
             if texts.insert(t) {
                 e.0 += 1; // pages
@@ -188,7 +188,7 @@ fn propagate(cands: &[Vec<Cand>], heights: &[f32], found: &mut [HashSet<usize>],
                 let c = &cands[i][ci];
                 in_band(c, edge, heights[i])
                     && lines
-                        .get(&norm(&c.text))
+                        .get(&c.key.norm)
                         .is_some_and(|(_, v)| v.iter().any(|&(j, cj)| similar(c, &cands[j][cj], 0)))
                     && passes_gate(c, &cands[i], &found[i], ci, edge)
             })
@@ -218,7 +218,7 @@ fn is_folio(mask: &str) -> bool {
 /// constant lines detected on at least [`MIN_SUPPORT`] pages are marked from their first page on. In a single-page document a page
 /// number at the end of the outermost row of an edge is marked alone ([`outer_folio`]). Each page
 /// comes with its tables: their cells are never running heads. Pages are read one at a time (a page built for the call can be dropped right
-/// after). Memory O(pages × edge-band candidates): candidate texts and span indices, no page
+/// after). Memory O(pages × edge-band candidates): candidate texts (with their normalized keys) and span indices, no page
 /// copies; work O(pages × layers).
 pub(crate) fn mark_running<'t, P: Borrow<StructuredPage>>(
     pages: impl IntoIterator<Item = (P, &'t [DetectedTable])>,
@@ -256,10 +256,10 @@ pub(crate) fn mark_running<'t, P: Borrow<StructuredPage>>(
     let mut stats: HashMap<String, (HashSet<usize>, HashSet<String>)> = HashMap::new();
     for (pi, c) in cands.iter().enumerate() {
         for &ci in head[pi].iter().chain(&foot[pi]) {
-            let t = norm(&c[ci].text);
-            let e = stats.entry(digit_mask(&t).0).or_default();
+            let k = &c[ci].key;
+            let e = stats.entry(k.mask.clone()).or_default();
             e.0.insert(pi);
-            e.1.insert(t);
+            e.1.insert(k.norm.clone());
         }
     }
     let keeps_first = |mask: &str| {
@@ -289,8 +289,7 @@ pub(crate) fn mark_running<'t, P: Borrow<StructuredPage>>(
             let Some(c) = cands.get_mut(ci).and_then(Option::take) else {
                 continue;
             };
-            let mask = digit_mask(&norm(&c.text)).0;
-            if keeps_first(&mask) && seen.insert(mask) {
+            if keeps_first(&c.key.mask) && seen.insert(c.key.mask.clone()) {
                 cands[ci] = Some(c); // first occurrence stays body text
                 continue;
             }

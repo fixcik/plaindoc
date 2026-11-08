@@ -334,6 +334,7 @@ fn numbering_needs_the_page_step() {
         size: 9.0,
         bbox: Rect::new(0.0, 0.0, 50.0, 9.0),
         chunks: 1,
+        key: Key::of(t),
     };
     assert!(similar(&c("Page 3 of 9"), &c("Page 4 of 9"), 1));
     assert!(similar(&c("12"), &c("14"), 2));

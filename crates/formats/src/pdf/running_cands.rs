@@ -18,6 +18,25 @@ pub(super) struct Cand {
     pub(super) bbox: Rect,
     /// Most chunks on one line of the paragraph (spans split by gaps > [`CHUNK_GAP_FS`]).
     pub(super) chunks: usize,
+    /// `text` normalized and digit-masked, kept in step with `text`.
+    pub(super) key: Key,
+}
+
+/// [`norm`] of a candidate's text and the [`digit_mask`] of that, computed once per candidate:
+/// [`similar`] compares them for every neighbouring page and layer.
+#[derive(Clone, Debug, Default)]
+pub(super) struct Key {
+    pub(super) norm: String,
+    pub(super) mask: String,
+    pub(super) nums: Vec<u64>,
+}
+
+impl Key {
+    pub(super) fn of(text: &str) -> Self {
+        let norm = norm(text);
+        let (mask, nums) = digit_mask(&norm);
+        Key { norm, mask, nums }
+    }
 }
 
 pub(super) fn norm(t: &str) -> String {
@@ -72,17 +91,17 @@ pub(super) fn similar(a: &Cand, b: &Cand, step: u64) -> bool {
     {
         return false;
     }
-    let (ta, tb) = (norm(&a.text), norm(&b.text));
-    if ta == tb {
+    let (ka, kb) = (&a.key, &b.key);
+    if ka.norm == kb.norm {
         return true;
     }
-    let ((ma, na), (mb, nb)) = (digit_mask(&ta), digit_mask(&tb));
-    if ma != mb || na.is_empty() || na.len() != nb.len() {
+    let (na, nb) = (&ka.nums, &kb.nums);
+    if ka.mask != kb.mask || na.is_empty() || na.len() != nb.len() {
         return false;
     }
     let diffs: Vec<u64> = na
         .iter()
-        .zip(&nb)
+        .zip(nb)
         .filter(|(x, y)| x != y)
         .map(|(x, y)| x.abs_diff(*y))
         .collect();
@@ -190,12 +209,11 @@ pub(super) fn candidates(page: &StructuredPage, tables: &[DetectedTable], body: 
                     .map(|l| l.text.as_str())
                     .collect::<Vec<_>>()
                     .join(" ");
+                let key = Key::of(&text);
                 if bbox.y.is_finite()
                     && bbox.height.is_finite()
                     && size.is_finite()
-                    && (body <= 0.0
-                        || size <= MAX_SIZE_OF_BODY * body
-                        || is_folio(&digit_mask(&norm(&text)).0))
+                    && (body <= 0.0 || size <= MAX_SIZE_OF_BODY * body || is_folio(&key.mask))
                 {
                     out.push(Cand {
                         chunks: max_chunks(&r.spans, &idx, &line_of[s0..s1], &live[s0..s1]),
@@ -203,6 +221,7 @@ pub(super) fn candidates(page: &StructuredPage, tables: &[DetectedTable], body: 
                         text,
                         size,
                         bbox,
+                        key,
                     });
                 }
                 a = b;
@@ -217,6 +236,7 @@ pub(super) fn candidates(page: &StructuredPage, tables: &[DetectedTable], body: 
             size: f32::NAN,
             bbox,
             chunks: 1,
+            key: Key::default(),
         });
     }
     out
@@ -245,6 +265,7 @@ pub(super) fn merge_edge_rows(cands: Vec<Cand>, h: f32) -> Vec<Cand> {
         row.sort_by(|a, b| a.bbox.x.total_cmp(&b.bbox.x));
         let mut it = row.into_iter();
         let Some(mut m) = it.next() else { continue };
+        let mut merged = false;
         for c in it {
             m.text.push(' ');
             m.text.push_str(&c.text);
@@ -252,6 +273,10 @@ pub(super) fn merge_edge_rows(cands: Vec<Cand>, h: f32) -> Vec<Cand> {
             m.bbox = m.bbox.union(&c.bbox);
             m.chunks += c.chunks;
             m.spans.extend(c.spans);
+            merged = true;
+        }
+        if merged {
+            m.key = Key::of(&m.text);
         }
         out.push(m);
     }
