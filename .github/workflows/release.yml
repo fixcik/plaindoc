@@ -20,9 +20,11 @@ jobs:
       matrix:
         include:
           - { target: aarch64-apple-darwin, os: macos-15 }
-          # Old glibc on purpose: the binary runs on glibc >= the runner's.
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          # The prebuilt static ONNX Runtime (ort-sys) needs glibc >= 2.38 and GCC 13's
+          # libstdc++ to link; 24.04 is the oldest runner with both. The binary then needs
+          # the same or newer on the user's system (the versions are printed below).
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-24.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-24.04-arm }
           - { target: x86_64-pc-windows-msvc, os: windows-2022 }
           # x86_64-apple-darwin is not built: ort-sys 2.0.0-rc.13 (ONNX Runtime 1.28) has no
           # prebuilt static ONNX Runtime for it (see its build/download/dist.tsv).

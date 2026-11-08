@@ -270,7 +270,14 @@ fn rotated_page_merge_has_no_duplicates() {
     )
     .unwrap();
     let s = &p.document.sections[0];
-    assert_eq!(s.source, TextSource::Mixed, "merge path, not replace");
+    assert_eq!(
+        s.source,
+        TextSource::Mixed,
+        "merge path, not replace: {:?} {:?} {:?}",
+        p.decisions,
+        s.warnings,
+        s.blocks
+    );
     // All text blocks: a layer line laid out as a heading must not hide an OCR copy.
     let texts: Vec<&str> = s
         .blocks
