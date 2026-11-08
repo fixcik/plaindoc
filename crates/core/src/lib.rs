@@ -27,6 +27,7 @@ mod guard;
 pub mod telemetry;
 pub use guard::{catch_parse, catch_parse_with_stats, run_parser, run_parser_with_stats};
 
+mod chunks;
 mod markdown;
 mod md_alt;
 mod md_images;

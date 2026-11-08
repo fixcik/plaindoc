@@ -28,7 +28,21 @@ impl Document {
     /// Pretty-printed JSON, without a trailing newline.
     #[must_use]
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).expect("Document is always serializable")
+        let mut out = Vec::new();
+        self.write_json(&mut out)
+            .expect("Document is always serializable");
+        String::from_utf8(out).expect("JSON is UTF-8")
+    }
+
+    /// Writes the same pretty-printed JSON as [`Document::to_json`] into `out`, without holding the
+    /// whole text in memory. `out` gets the text in chunks of about 64 KiB, so it needs no buffer of
+    /// its own. Nothing is flushed. The first write error is returned with its kind kept (e.g.
+    /// `BrokenPipe`) once the document is rendered; nothing after it is written, what was written
+    /// before it stays in `out`.
+    pub fn write_json<W: std::io::Write + ?Sized>(&self, out: &mut W) -> std::io::Result<()> {
+        let mut chunks = crate::chunks::Chunks::new(out);
+        serde_json::to_writer_pretty(&mut chunks, self).map_err(std::io::Error::from)?;
+        chunks.finish()
     }
 }
 
