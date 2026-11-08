@@ -1526,7 +1526,7 @@ dependencies = [
 [[package]]
 name = "pdf_oxide"
 version = "0.3.78"
-source = "git+https://github.com/fixcik/pdf_oxide?rev=71555ed4ed8282b5078c7d808ebc7966aee83117#71555ed4ed8282b5078c7d808ebc7966aee83117"
+source = "git+https://github.com/fixcik/pdf_oxide?rev=1ab8c52bb99a0b4aad33d42fadbfb1499bf41693#1ab8c52bb99a0b4aad33d42fadbfb1499bf41693"
 dependencies = [
  "aes",
  "base64",
