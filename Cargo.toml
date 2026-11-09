@@ -33,7 +33,7 @@ html5ever = "0.40.1"
 ego-tree = "0.11.1"
 roxmltree = "0.21.2"
 zip = { version = "9.1", default-features = false, features = ["deflate"] }
-pdf_oxide = { git = "https://github.com/fixcik/pdf_oxide", rev = "bbfcebfcc975acbd2082982d865a76d85748f650", features = ["parallel"] }
+pdf_oxide = { git = "https://github.com/fixcik/pdf_oxide", rev = "0151efd3c7c162a2ba4b5738aa0a5f555b30ea6b", features = ["parallel"] }
 
 [profile.dev]
 panic = "unwind"
