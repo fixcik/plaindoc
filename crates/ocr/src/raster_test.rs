@@ -185,3 +185,56 @@ fn raster_normalize_bg_flattens_uneven_light() {
     assert!((n[10 * 200 + 20] - 1.0).abs() < 0.05 && (n[10 * 200 + 180] - 1.0).abs() < 0.05);
     assert!(n[30 * 200 + 150] < 0.3);
 }
+
+/// `rotate` with every pixel through `cubic_taps` (the path before the inside-the-image fast path).
+fn rotate_by_taps(img: &Image, deg: f32, fill: [u8; 3]) -> Image {
+    let (w, h) = img.dimensions();
+    let src = img.as_raw();
+    let mut out = vec![0u8; src.len()];
+    warp(w as usize, h as usize, deg, 0.0, cubic_taps, |i, taps| {
+        let mut v = [0f32; 3];
+        for (j, wt) in taps {
+            let px = j.map_or(fill, |j| [src[3 * j], src[3 * j + 1], src[3 * j + 2]]);
+            for c in 0..3 {
+                v[c] += wt * f32::from(px[c]);
+            }
+        }
+        for c in 0..3 {
+            out[3 * i + c] = v[c].round().clamp(0.0, 255.0) as u8;
+        }
+    });
+    Image::from_raw(w, h, out).unwrap()
+}
+
+#[test]
+fn rotate_fast_path_matches_the_taps() {
+    let img = Image::from_fn(97, 61, |x, y| {
+        image::Rgb([(x * 37 + y * 11) as u8, (x * y) as u8, (x ^ (y * 5)) as u8])
+    });
+    for deg in [
+        -3.0,
+        -0.4,
+        0.1,
+        2.7,
+        45.0,
+        90.0,
+        -179.0,
+        f32::NAN,
+        f32::INFINITY,
+    ] {
+        assert_eq!(
+            rotate(&img, deg, [9, 200, 77]),
+            rotate_by_taps(&img, deg, [9, 200, 77]),
+            "{deg}"
+        );
+    }
+    for (w, h) in [(1, 1), (3, 3), (4, 4), (5, 2)] {
+        let small = Image::from_fn(w, h, |x, y| {
+            image::Rgb([(x * 50) as u8, (y * 70) as u8, 128])
+        });
+        assert_eq!(
+            rotate(&small, 1.5, [255; 3]),
+            rotate_by_taps(&small, 1.5, [255; 3])
+        );
+    }
+}

@@ -28,14 +28,28 @@ pub fn rotate(img: &Image, deg: f32, fill: [u8; 3]) -> Image {
         return img.clone();
     }
     let (w, h) = img.dimensions();
+    let (wu, hu) = (w as usize, h as usize);
     let src = img.as_raw();
     let mut out = vec![0u8; src.len()];
-    warp(w as usize, h as usize, deg, 0.0, cubic_taps, |i, taps| {
+    warp_at(wu, hu, deg, 0.0, |i, x, y| {
         let mut v = [0f32; 3];
-        for (j, wt) in taps {
-            let px = j.map_or(fill, |j| [src[3 * j], src[3 * j + 1], src[3 * j + 2]]);
-            for c in 0..3 {
-                v[c] += wt * f32::from(px[c]);
+        if let Some((first, wx, wy)) = cubic_inside(x, y, wu, hu) {
+            // All 16 taps inside: the same weights and summation order as `cubic_taps`.
+            for (j, wy) in wy.iter().enumerate() {
+                let row = 3 * (first + j * wu);
+                for (k, wx) in wx.iter().enumerate() {
+                    let (wt, s) = (wx * wy, row + 3 * k);
+                    for c in 0..3 {
+                        v[c] += wt * f32::from(src[s + c]);
+                    }
+                }
+            }
+        } else {
+            for (j, wt) in cubic_taps(x, y, wu, hu) {
+                let px = j.map_or(fill, |j| [src[3 * j], src[3 * j + 1], src[3 * j + 2]]);
+                for c in 0..3 {
+                    v[c] += wt * f32::from(px[c]);
+                }
             }
         }
         for c in 0..3 {
@@ -229,6 +243,11 @@ fn warp<const N: usize>(
     sample: fn(f64, f64, usize, usize) -> Taps<N>,
     mut f: impl FnMut(usize, Taps<N>),
 ) {
+    warp_at(w, h, deg, shift, |i, x, y| f(i, sample(x, y, w, h)));
+}
+
+/// As [`warp`], but calls `f(dst_index, x, y)` with the source point itself.
+fn warp_at(w: usize, h: usize, deg: f32, shift: f64, mut f: impl FnMut(usize, f64, f64)) {
     let (s, c) = f64::from(deg).to_radians().sin_cos();
     let (cx, cy) = (w as f64 / 2.0, h as f64 / 2.0);
     let u0 = -shift - cx;
@@ -236,11 +255,23 @@ fn warp<const N: usize>(
         let v = y as f64 - shift - cy;
         let (mut sx, mut sy) = (cx + u0 * c - v * s, cy + u0 * s + v * c);
         for x in 0..w {
-            f(y * w + x, sample(sx, sy, w, h));
+            f(y * w + x, sx, sy);
             sx += c;
             sy += s;
         }
     }
+}
+
+/// When all 4×4 taps of [`cubic_taps`] at `(x, y)` lie inside the image: the index of the top-left
+/// tap and the Keys weights along x and y (tap `4 * j + i` weighs `wx[i] * wy[j]`).
+fn cubic_inside(x: f64, y: f64, w: usize, h: usize) -> Option<(usize, [f32; 4], [f32; 4])> {
+    let (x0, y0) = (x.floor(), y.floor());
+    // NaN fails every comparison; infinities fail the upper bounds.
+    let inside = x0 >= 1.0 && y0 >= 1.0 && x0 + 2.0 < w as f64 && y0 + 2.0 < h as f64;
+    inside.then(|| {
+        let first = (y0 as usize - 1) * w + x0 as usize - 1;
+        (first, keys((x - x0) as f32), keys((y - y0) as f32))
+    })
 }
 
 /// Bilinear taps at `(x, y)`: the 4 neighbouring pixels (index, `None` outside) and their weights.
