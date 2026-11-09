@@ -1,9 +1,10 @@
 use crate::EXIT_USAGE;
 use crate::args::{Cli, Cmd, HiddenArg, OcrArg, OutFormat, PageSeparatorArg, ParseArgs};
 use crate::paths::{Collected, collect, output_paths};
+use crate::pictures::{named_pictures, write_images};
 use plaindoc_core::{
     Document, Format, HiddenText, Input, Level, MarkdownOptions, OcrMode, PageSeparator,
-    ParseError, ParseOptions, ParseStats, image_set_id,
+    ParseError, ParseOptions, ParseStats,
 };
 use plaindoc_formats::Registry;
 use std::io::{self, Write};
@@ -138,6 +139,7 @@ fn options(args: &ParseArgs) -> ParseOptions {
         OcrArg::Auto => OcrMode::Auto,
         OcrArg::Always => OcrMode::Always,
         OcrArg::Never => OcrMode::Never,
+        OcrArg::Images => OcrMode::Images,
     };
     opts.hidden_text = match args.hidden_text {
         HiddenArg::Off => HiddenText::Off,
@@ -178,38 +180,6 @@ fn render(
             doc.write_markdown_with(&o, out)
         }
     }
-}
-
-/// Id lengths tried for the pictures directory, in order.
-const ID_LENGTHS: [usize; 3] = [6, 8, 10];
-
-/// Writes the stored pictures of `doc` into `parent/img-<id>/` and returns the directory name
-/// (`None` when there are no pictures). The id is a prefix of the picture-set hash
-/// ([`image_set_id`]): 6 hex chars; when that directory already holds a different file under one
-/// of our names, 8, then 10 are tried. A directory that holds the same bytes is reused.
-fn write_images(doc: &Document, parent: &Path) -> io::Result<Option<String>> {
-    if doc.images.is_empty() {
-        return Ok(None);
-    }
-    for len in ID_LENGTHS {
-        let name = format!("img-{}", image_set_id(&doc.images, len));
-        let dir = parent.join(&name);
-        let same = |img: &plaindoc_core::StoredImage| {
-            std::fs::read(dir.join(&img.file)).is_ok_and(|b| b == *img.data)
-        };
-        let clash = |img: &plaindoc_core::StoredImage| dir.join(&img.file).exists() && !same(img);
-        if doc.images.iter().any(clash) {
-            continue;
-        }
-        std::fs::create_dir_all(&dir)?;
-        for img in doc.images.iter().filter(|i| !same(i)) {
-            std::fs::write(dir.join(&img.file), &img.data)?;
-        }
-        return Ok(Some(name));
-    }
-    Err(io::Error::other(
-        "pictures directory name is taken by different files",
-    ))
 }
 
 fn print_warnings(path: &Path, doc: &Document) {
@@ -392,6 +362,13 @@ fn parse(registry: &Registry, args: ParseArgs) -> u8 {
         low |= args.min_quality.is_some_and(|m| doc.quality < m);
         match &outs {
             None => {
+                let n = named_pictures(&doc);
+                if n > 0 && !args.no_warnings {
+                    elog!(
+                        "note: {}: {n} picture(s) not saved: pass -o DIR to write them as files",
+                        path.display()
+                    );
+                }
                 if !print_with(|w| render(&doc, &args, None, w), &mut failed) {
                     break;
                 }

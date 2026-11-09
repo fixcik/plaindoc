@@ -186,3 +186,69 @@ fn absolute_inputs_keep_only_their_names() {
     assert!(one.join(img_dir(&one)).join("image1.png").exists());
     assert!(dir.join("two/x.html.md").exists());
 }
+
+/// A PDF page with a text layer and a picture: the picture goes to `img-<id>/` and is linked;
+/// `--ocr images` is accepted and links it too.
+#[test]
+fn pdf_picture_is_written_and_linked() {
+    let src =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../formats/tests/fixtures/pdf/imgtext.pdf");
+    for mode in ["auto", "images", "never"] {
+        let d = tempfile::tempdir().unwrap();
+        fs::copy(&src, d.path().join("a.pdf")).unwrap();
+        run(d.path(), &["a.pdf", "--ocr", mode, "-o", "out"]);
+        let out = d.path().join("out");
+        let dir = img_dir(&out);
+        assert!(out.join(&dir).join("image1.png").is_file(), "{mode}");
+        let md = fs::read_to_string(out.join("a.pdf.md")).unwrap();
+        assert!(md.contains(&format!("]({dir}/image1.png)")), "{mode}: {md}");
+    }
+}
+
+#[test]
+fn help_names_the_images_ocr_mode() {
+    let out = cargo_bin_cmd!("plaindoc")
+        .args(["parse", "--help"])
+        .output()
+        .unwrap();
+    let help = String::from_utf8_lossy(&out.stdout);
+    assert!(help.contains("images"), "{help}");
+    assert!(
+        help.contains("[possible values: auto, always, never, images]"),
+        "{help}"
+    );
+}
+
+fn parse_out(cwd: &Path, args: &[&str]) -> (String, String) {
+    let out = cargo_bin_cmd!("plaindoc")
+        .current_dir(cwd)
+        .arg("parse")
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    (
+        String::from_utf8(out.stdout).unwrap(),
+        String::from_utf8(out.stderr).unwrap(),
+    )
+}
+
+/// Without -o the pictures are only named: one stderr note per document, stdout unchanged.
+#[test]
+fn stdout_output_notes_unsaved_pictures() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "a.html", &html());
+    write(d.path(), "b.html", "<p>no pictures</p>");
+    let note = "note: a.html: 1 picture(s) not saved: pass -o DIR to write them as files\n";
+    let (md, err) = parse_out(d.path(), &["a.html"]);
+    assert_eq!(err, note);
+    assert!(md.contains("![схема](image1.png)"), "{md}");
+    // no pictures, --no-images, --no-warnings: no note
+    assert_eq!(parse_out(d.path(), &["b.html"]).1, "");
+    assert_eq!(parse_out(d.path(), &["a.html", "--no-images"]).1, "");
+    assert_eq!(parse_out(d.path(), &["a.html", "--no-warnings"]).1, "");
+    // with -o (also a batch of two files): pictures are written, no note
+    let (_, err) = parse_out(d.path(), &["a.html", "b.html", "-o", "o"]);
+    assert!(!err.contains("not saved"), "{err}");
+    assert_eq!(err.lines().count(), 2, "{err}");
+}

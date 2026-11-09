@@ -1,6 +1,7 @@
 mod args;
 mod commands;
 mod paths;
+mod pictures;
 
 use clap::Parser as _;
 use std::io::Write as _;

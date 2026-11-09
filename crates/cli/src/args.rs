@@ -54,12 +54,16 @@ pub struct ParseArgs {
     pub paths: Vec<PathBuf>,
     #[arg(short = 'f', long = "format", value_enum, default_value_t = OutFormat::Markdown)]
     pub format: OutFormat,
+    /// OCR: where text is missing (auto), everything (always), nothing (never), or as auto plus
+    /// the images on PDF pages with a text layer (images). Under auto such images are not
+    /// recognised: they are kept as pictures and the page gets an info warning.
     #[arg(long, value_enum, default_value_t = OcrArg::Auto)]
     pub ocr: OcrArg,
     /// Hidden text (white on white, microscopic, hidden layers, invisible Unicode): remove, flag or keep.
     #[arg(long, value_enum, default_value_t = HiddenArg::Strip)]
     pub hidden_text: HiddenArg,
-    /// Write results into DIR (required for several files or a directory).
+    /// Write results into DIR (required for several files or a directory). Pictures are written as
+    /// files only with -o; without it stderr gets one note per document with pictures.
     #[arg(short = 'o', long = "out", value_name = "DIR")]
     pub out: Option<PathBuf>,
     /// Number of files parsed in parallel (0 = rayon default).
@@ -82,7 +86,7 @@ pub struct ParseArgs {
     /// Do not read link annotations (PDF): no `[text](url)` in Markdown, no `links` in JSON.
     #[arg(long)]
     pub no_links: bool,
-    /// Do not extract embedded pictures (office, ODF, RTF, HTML): bare `<!-- image -->` marks.
+    /// Do not extract embedded pictures (office, ODF, RTF, HTML, PDF): bare `<!-- image -->` marks.
     /// With -o DIR pictures go to `img-<id>/imageN.<ext>` next to the result (<id>: 6 hex chars of the pictures' hash); without -o they
     /// are named in the links but not written.
     #[arg(long)]
@@ -110,6 +114,7 @@ pub enum OcrArg {
     Auto,
     Always,
     Never,
+    Images,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
