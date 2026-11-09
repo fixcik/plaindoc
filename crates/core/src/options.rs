@@ -4,10 +4,19 @@ use std::time::Duration;
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum OcrMode {
+    /// OCR where text is missing: scanned PDF pages, PDF pages without a usable text layer,
+    /// office sections without text. Images on PDF pages with a text layer are not recognised:
+    /// they become pictures (`Block::Image`) and the page gets an `ImageTextPage`/Info warning.
     #[default]
     Auto,
+    /// OCR of every page and image, merged with the text layer.
     Always,
+    /// No OCR.
     Never,
+    /// As `Auto`, plus OCR of the images on PDF pages with a text layer that the need-OCR
+    /// classifier flags (the `Auto` of earlier versions); their pictures are linked too. Other
+    /// formats: as `Auto`.
+    Images,
 }
 
 /// Text the reader cannot see (white on white, microscopic, off-page, hidden layers, invisible

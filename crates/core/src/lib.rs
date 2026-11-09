@@ -37,4 +37,6 @@ mod detect;
 pub use detect::{CFB_MAGIC, DETECT_HEAD_LEN, classify_cfb_streams, detect};
 
 mod stats;
-pub use stats::{LevelCounts, LimitKind, Outcome, PageCounts, ParseStats, Sizes, Stage};
+pub use stats::{
+    ImageCounts, LevelCounts, LimitKind, Outcome, PageCounts, ParseStats, Sizes, Stage,
+};

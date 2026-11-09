@@ -12,7 +12,8 @@ use crate::{Block, Document, Format, Level, ParseError, Result, TextSource, Warn
 
 /// Pipeline stage. PDF: `Open` = `open_input`; `Text` = `extract_structured` + `classify_page`;
 /// `Tables` = table detector with its input; `Diagnose` = stage-1 diagnosis including the need-OCR
-/// classifier (50-dpi render); `Ocr` = OCR pass; `Assemble` = stage B and document warnings.
+/// classifier (50-dpi render); `Ocr` = OCR pass; `Images` = decoding the pictures of pages with a
+/// text layer; `Assemble` = stage B and document warnings.
 /// Other formats report no stages yet (only `wall_us`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -23,6 +24,7 @@ pub enum Stage {
     Tables,
     Diagnose,
     Ocr,
+    Images,
     Assemble,
 }
 
@@ -35,6 +37,7 @@ impl Stage {
             Stage::Tables => "tables",
             Stage::Diagnose => "diagnose",
             Stage::Ocr => "ocr",
+            Stage::Images => "images",
             Stage::Assemble => "assemble",
         }
     }
@@ -200,6 +203,20 @@ pub struct Sizes {
     pub est_work_bytes: u64,
 }
 
+/// Pictures of the document.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
+pub struct ImageCounts {
+    /// `Block::Image` blocks that link a stored picture (every occurrence; one file may serve
+    /// several).
+    pub linked: u64,
+    /// PDF: images on pages with a text layer that were not sent to OCR (`OcrMode::Auto`).
+    pub ocr_skipped: u64,
+    /// PDF: images left out of the output as page furniture (running repeats such as a header
+    /// logo, small images and plates).
+    pub dropped: u64,
+}
+
 /// Statistics of one parse (see the module docs for what never goes in).
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[non_exhaustive]
@@ -220,6 +237,7 @@ pub struct ParseStats {
     /// Warnings of the document and of its sections, by kind and level.
     pub warnings: BTreeMap<WarningKind, LevelCounts>,
     pub sizes: Sizes,
+    pub images: ImageCounts,
     /// Panics caught below the document level after which the document survived (PDF: the table
     /// detector of a page). A panic of the whole parse is `outcome: internal`.
     pub panics_isolated: u32,
@@ -266,6 +284,7 @@ impl ParseStats {
         self.sizes.text_bytes = t.text_bytes;
         self.sizes.tables = t.tables;
         self.sizes.cells = t.cells;
+        self.images.linked = t.linked;
         self.pages.processed = doc.sections.len();
         self.pages.total = doc.metadata.page_count.unwrap_or(doc.sections.len());
         let src = |k: TextSource| doc.sections.iter().filter(|s| s.source == k).count();
@@ -336,6 +355,7 @@ struct Tally {
     text_bytes: u64,
     tables: u64,
     cells: u64,
+    linked: u64,
 }
 
 impl Tally {
@@ -366,9 +386,17 @@ impl Tally {
                         self.blocks(&c.blocks);
                     }
                 }
-                Block::Image { ocr_text, .. } => {
+                Block::Image {
+                    ocr_text, image, ..
+                } => {
                     if let Some(t) = ocr_text {
                         self.text(t);
+                    }
+                    if image
+                        .as_deref()
+                        .is_some_and(|i| i.file.is_some() && i.skipped.is_none())
+                    {
+                        self.linked = self.linked.saturating_add(1);
                     }
                 }
             }

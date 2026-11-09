@@ -62,7 +62,8 @@ impl OcrRun {
                 break;
             }
             let s = &doc.sections[i];
-            if self.mode == OcrMode::Auto && !wants_ocr_without_engine(s) {
+            if matches!(self.mode, OcrMode::Auto | OcrMode::Images) && !wants_ocr_without_engine(s)
+            {
                 continue;
             }
             let imgs = top_images(source(ir, doc, i));
