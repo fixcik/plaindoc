@@ -25,6 +25,7 @@ mod ocr_stage;
 mod open;
 mod order;
 mod outline;
+mod pictures;
 mod pipeline;
 mod runner;
 mod running;

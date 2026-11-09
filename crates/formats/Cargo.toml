@@ -11,7 +11,7 @@ text = ["dep:csv", "dep:encoding_rs", "dep:chardetng"]
 markup = ["text", "dep:scraper", "dep:html5ever", "dep:ego-tree", "dep:roxmltree", "dep:base64"]
 odf = ["dep:zip", "dep:roxmltree", "dep:base64"]
 rtf = ["dep:encoding_rs"]
-pdf = ["dep:pdf_oxide", "dep:serde_json", "dep:sha2", "dep:strsim", "tables"]
+pdf = ["dep:pdf_oxide", "dep:serde_json", "dep:sha2", "dep:strsim", "dep:image", "tables"]
 tables = []
 tables-eval = ["tables", "dep:serde_json"]
 office = ["dep:office_oxide", "dep:zip", "dep:crc32fast"]
@@ -72,6 +72,10 @@ required-features = ["pdf"]
 [[test]]
 name = "pdf_odl"
 required-features = ["pdf"]
+
+[[test]]
+name = "pdf_pictures"
+required-features = ["pdf", "ocr"]
 
 [[test]]
 name = "need_ocr_eval"

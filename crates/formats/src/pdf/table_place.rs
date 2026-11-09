@@ -86,6 +86,19 @@ pub(crate) fn place_tables(blocks: &mut Vec<Block>, tables: &[DetectedTable]) {
     }
 }
 
+/// Inserts `b` before the first block whose top edge is not above `b`'s and that overlaps it
+/// horizontally (as [`place_tables`]); blocks without a box go to the end.
+pub(crate) fn place_by_top(blocks: &mut Vec<Block>, b: Block) {
+    let at = block_bbox(&b).and_then(|t| {
+        let top = t.y + t.h;
+        blocks.iter().position(|o| {
+            block_bbox(o)
+                .is_some_and(|bb| bb.y + bb.h <= top + 1.0 && bb.x < t.x + t.w && t.x < bb.x + bb.w)
+        })
+    });
+    blocks.insert(at.unwrap_or(blocks.len()), b);
+}
+
 pub(crate) fn block_bbox(b: &Block) -> Option<BBox> {
     match b {
         Block::Heading { bbox, .. }

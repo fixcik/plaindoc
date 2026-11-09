@@ -29,6 +29,7 @@ use super::ocr_stage::{OcrPageCounts, PageOcr};
 use super::open::OpenedPdf;
 use super::order::order_blocks;
 use super::outline::Outline;
+use super::pictures::{decode_pass, place, running_repeats};
 use super::running::{mark_running, move_out};
 use super::table_place::{place_tables, strip_table_text};
 use super::tables::{DetectedTable, TableInputCounts, continues};
@@ -65,6 +66,7 @@ struct PageCounters {
     text: Duration,
     tables: Duration,
     diagnose: Duration,
+    images: Duration,
     spans: u64,
     page_bytes: u64,
     table_in: TableInputCounts,
@@ -82,6 +84,8 @@ struct RawPage {
     links: PageLinks,
     /// Small filled shapes that may be list bullets (set by stage A).
     bullets: Vec<super::bullets::Bullet>,
+    /// Images of a page that keeps its text layer, for pictures (set by stage A).
+    pictures: Option<super::pictures::PagePictures>,
     /// The decision to OCR the page under, when it needs OCR (set by stage A).
     #[cfg(feature = "ocr")]
     ocr_want: Option<PageDecision>,
@@ -122,6 +126,9 @@ fn count_page(stats: &mut ParseStats, p: usize, r: &RawPage, est: &mut WorkEstim
     stats.add_stage(Stage::Text, c.text);
     stats.add_stage(Stage::Tables, c.tables);
     stats.add_stage(Stage::Diagnose, c.diagnose);
+    if r.pictures.is_some() {
+        stats.add_stage(Stage::Images, c.images);
+    }
     let z = &mut stats.sizes;
     z.spans = z.spans.saturating_add(c.spans);
     let (w, pr) = (c.table_in.words as u64, c.table_in.prims as u64);
@@ -227,6 +234,19 @@ pub(crate) fn parse_opened(
         (1..n).map(page_a).collect::<Result<Vec<_>>>()?
     };
     raw.extend(rest);
+    // Pictures: running repeats over all pages, then each kept raster decoded once.
+    let repeats = running_repeats(raw.iter().filter_map(|r| r.pictures.as_ref()), n);
+    let (decoded, images_took) = if opts.images.enabled && raw.iter().any(|r| r.pictures.is_some())
+    {
+        let pages: Vec<_> = raw.iter().map(|r| r.pictures.as_ref()).collect();
+        let parallel = ctx.page_parallel_allowed && opts.page_parallel;
+        let (d, t) = timed(Stage::Images, || {
+            decode_pass(doc, &pages, &repeats, parallel)
+        });
+        (Some(d), t)
+    } else {
+        (None, Duration::ZERO)
+    };
     // OCR pass in the same job; small documents too (each OCR page is heavy).
     #[cfg(feature = "ocr")]
     let pass = ocr_pass(
@@ -244,6 +264,9 @@ pub(crate) fn parse_opened(
     let mut stats = ParseStats::default();
     stats.page_parallel = parallel;
     stats.add_stage(Stage::Text, ocgs_took + scan_took);
+    if decoded.is_some() {
+        stats.add_stage(Stage::Images, images_took);
+    }
     let mut est = WorkEstimate::default();
     let ok_pages: Vec<&StructuredPage> = raw
         .iter()
@@ -331,6 +354,18 @@ pub(crate) fn parse_opened(
                 Level::Warn,
                 format!("table detection failed: {e}"),
             )),
+        }
+        if let Some(pg) = &r.pictures {
+            let k = place(
+                &mut section.blocks,
+                &mut section.warnings,
+                pg,
+                &repeats,
+                decoded.as_ref(),
+            );
+            let c = &mut stats.images;
+            c.dropped = c.dropped.saturating_add(k.dropped as u64);
+            c.ocr_skipped = c.ocr_skipped.saturating_add(pg.ocr_skipped as u64);
         }
         // XY-cut on pages with columns only: one-column pages keep the region order (diagram
         // labels and figures move under XY-cut, SP8 task 9)

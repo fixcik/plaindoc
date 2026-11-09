@@ -5,18 +5,18 @@ use std::time::{Duration, Instant};
 
 use pdf_oxide::optional_content::LayerFilter;
 use pdf_oxide::{PdfDocument, RegionRole, StructuredPage};
-#[cfg(feature = "ocr")]
 use plaindoc_core::OcrMode;
 use plaindoc_core::telemetry;
 use plaindoc_core::{HiddenText, ParseError, ParseOptions, Result, Stage};
 
 use super::super::PdfConfig;
 use super::super::bullets::bullet_boxes;
+#[cfg(feature = "ocr")]
+use super::super::diagnose::PageDecision;
+use super::super::diagnose::ocr_needs;
 use super::super::diagnose::{
     ClassifyOutcome, FactKind, PageDiagnosis, PageFacts, diagnose_page, extraction_failed,
 };
-#[cfg(feature = "ocr")]
-use super::super::diagnose::{PageDecision, ocr_needs};
 use super::super::garbage::garbage_score;
 use super::super::hidden::{HiddenCounts, SCAN_IMAGE_SHARE, filter_page_boxes, page_facts};
 use super::super::layout::non_ws_chars;
@@ -25,6 +25,7 @@ use super::super::need_ocr::page_signals;
 use super::super::ocg::extract_page;
 #[cfg(feature = "ocr")]
 use super::super::ocr_stage::OcrPageCounts;
+use super::super::pictures::{self, PagePictures};
 use super::super::spacing::tighten_page;
 use super::super::tables::{TableInputCounts, WordFilter};
 use super::{PageCounters, RawPage};
@@ -81,6 +82,43 @@ fn page_diagnosis(
         dropped_chars,
         d,
     )
+}
+
+/// Images of a page that keeps its text layer (`pictures::takes_pictures`), listed without
+/// decoding; under `OcrMode::Auto` the policy then takes the page's image OCR off
+/// (`pictures::skip_image_ocr`, which rewrites `diag`).
+fn page_pictures(
+    doc: &PdfDocument,
+    p: usize,
+    structured: &std::result::Result<StructuredPage, String>,
+    classify: &ClassifyOutcome,
+    diag: &mut PageDiagnosis,
+    cfg: &PdfConfig,
+    opts: &ParseOptions,
+) -> Option<PagePictures> {
+    let (Ok(page), ClassifyOutcome::Facts(f)) = (structured, classify) else {
+        return None;
+    };
+    let wanted = ocr_needs(&[diag.decision], &cfg.diagnostics)[0];
+    let cover = f.image_area_ratio.min(1.0);
+    // cheap test first: most pages have no images
+    if cover <= 0.0 {
+        return None;
+    }
+    let nonws = page
+        .regions
+        .iter()
+        .filter(|r| r.kind != RegionRole::Artifact)
+        .map(|r| non_ws_chars(&r.text))
+        .sum();
+    if !pictures::takes_pictures(wanted, cover, nonws) {
+        return None;
+    }
+    let mut pics = pictures::collect(doc, p)?;
+    if opts.ocr == OcrMode::Auto {
+        pictures::skip_image_ocr(diag, wanted, &mut pics);
+    }
+    Some(pics)
 }
 
 pub(super) fn stage_a(
@@ -157,17 +195,22 @@ pub(super) fn stage_a(
     };
     drop(facts);
     let t2 = Instant::now();
-    let diag = telemetry::stage(Stage::Diagnose, || match &structured {
+    let mut diag = telemetry::stage(Stage::Diagnose, || match &structured {
         Ok(page) => page_diagnosis(doc, p, page, &classify, cfg),
         Err(e) => extraction_failed(e),
     });
     let t3 = Instant::now();
+    let pictures = telemetry::stage(Stage::Images, || {
+        page_pictures(doc, p, &structured, &classify, &mut diag, cfg, opts)
+    });
+    let t4 = Instant::now();
     // After the timers: the span walk is not part of any stage.
     let (spans, page_bytes) = structured.as_ref().map_or((0, 0), page_size);
     let counters = PageCounters {
         text: t1 - t0,
         tables: t2 - t1,
         diagnose: t3 - t2,
+        images: t4 - t3,
         spans,
         page_bytes,
         table_in,
@@ -201,6 +244,7 @@ pub(super) fn stage_a(
         hidden,
         links,
         bullets,
+        pictures,
         #[cfg(feature = "ocr")]
         ocr_want,
         #[cfg(feature = "ocr")]

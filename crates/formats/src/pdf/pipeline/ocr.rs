@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use pdf_oxide::PdfDocument;
 use plaindoc_core::telemetry;
 use plaindoc_core::{
-    Block, HiddenText, Level, ParseError, ParseOptions, Result, Section, Stage, WarningKind,
+    HiddenText, Level, ParseError, ParseOptions, Result, Section, Stage, WarningKind,
 };
 use rayon::prelude::*;
 
@@ -14,7 +14,7 @@ use super::super::PdfConfig;
 use super::super::diagnose::PageDecision;
 use super::super::hidden_ocr::ocr_mismatch_warning;
 use super::super::ocr_stage::{OcrPageCounts, PageOcr, ocr_failed_warning, run_page_ocr};
-use super::super::table_place::block_bbox;
+use super::super::table_place::place_by_top;
 use super::{RawPage, in_page};
 
 /// What the OCR pass did: `done < wanted` when `ocr_max_pages` cut pages off.
@@ -186,17 +186,4 @@ pub(super) fn apply_ocr(
         }
     }
     false
-}
-
-/// Inserts `b` before the first block whose top edge is not above `b`'s and that overlaps it
-/// horizontally (as SP4 `place_tables`); blocks without a box go to the end.
-fn place_by_top(blocks: &mut Vec<Block>, b: Block) {
-    let at = block_bbox(&b).and_then(|t| {
-        let top = t.y + t.h;
-        blocks.iter().position(|o| {
-            block_bbox(o)
-                .is_some_and(|bb| bb.y + bb.h <= top + 1.0 && bb.x < t.x + t.w && t.x < bb.x + bb.w)
-        })
-    });
-    blocks.insert(at.unwrap_or(blocks.len()), b);
 }
