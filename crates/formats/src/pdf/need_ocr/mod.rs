@@ -94,6 +94,12 @@ pub struct NeedOcrConfig {
     /// Render gate: skip the 50-dpi render when the page has a layer, no image and fewer
     /// painted paths than this (flips 2 of 1672 research pages, both towards the label).
     pub render_min_paths: usize,
+    /// Render gate, images: a page with a layer whose images cover at most this share of it
+    /// (summed, `classify_page`) counts as a page without images, so a small running logo or an
+    /// icon does not render every page (on a Chromium brochure the 50-dpi render of eight pages
+    /// was a third of the parse, all for a header logo of 0.6 %). 0.01 is a square of about
+    /// 70 pt (2.5 cm) on A4: little room for the `g_abs` glyph-like components of text in an image.
+    pub render_min_image_cover: f32,
 }
 
 impl NeedOcrConfig {
@@ -132,6 +138,7 @@ impl NeedOcrConfig {
         scan_cover: 0.8,
         prose_letter_share: 0.5,
         render_min_paths: 200,
+        render_min_image_cover: 0.01,
     };
 
     /// Balanced point: R1 test acc 0.940 / recall 0.856, R2 test-half acc 0.980 / recall 0.973.
@@ -200,10 +207,13 @@ pub(crate) struct PageSignals {
 }
 
 /// Render gate: whether the 50-dpi ink features are worth a render. A page with a text layer,
-/// no image and fewer than `render_min_paths` painted paths is decided on text alone.
+/// images over at most `render_min_image_cover` of it and fewer than `render_min_paths` painted
+/// paths is decided on text alone.
 #[cfg(feature = "ocr")]
 pub(crate) fn needs_render(t: &TextFeatures, h: &EngineHints, c: &NeedOcrConfig) -> bool {
-    t.nonws < c.min_chars || h.image_area_ratio > 0.0 || h.vector_path_count >= c.render_min_paths
+    t.nonws < c.min_chars
+        || h.image_area_ratio > c.render_min_image_cover
+        || h.vector_path_count >= c.render_min_paths
 }
 
 /// Rule cascade v2 (port of `phase2_v2.decide2`); the first matching rule wins.
@@ -496,7 +506,9 @@ mod tests {
             image_area_ratio: 0.01,
             ..Default::default()
         };
-        assert!(needs_render(&t, &h, &c), "any image");
+        assert!(!needs_render(&t, &h, &c), "small images only");
+        h.image_area_ratio = 0.0101;
+        assert!(needs_render(&t, &h, &c), "larger images");
     }
 
     /// One page, Helvetica with a /ToUnicode that maps "A" to U+FFFD, showing "AAAA BBBB".
