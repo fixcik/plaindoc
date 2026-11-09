@@ -21,7 +21,7 @@ use super::super::garbage::garbage_score;
 use super::super::hidden::{HiddenCounts, SCAN_IMAGE_SHARE, filter_page_boxes, page_facts};
 use super::super::layout::non_ws_chars;
 use super::super::links::page_links;
-use super::super::need_ocr::page_signals;
+use super::super::need_ocr::{NeedOcrConfig, page_signals};
 use super::super::ocg::extract_page;
 #[cfg(feature = "ocr")]
 use super::super::ocr_stage::OcrPageCounts;
@@ -47,13 +47,15 @@ fn page_size(page: &StructuredPage) -> (u64, u64) {
 }
 
 /// Stage-1 diagnosis of one page. The classifier signals (extra char pass, gated 50-dpi render)
-/// are computed only when `need_ocr` is switched on.
+/// are computed only when `need_ocr` is switched on. The render gate on small images applies
+/// under `OcrMode::Auto` only: the other modes OCR images on text pages and keep the full render.
 fn page_diagnosis(
     doc: &PdfDocument,
     p: usize,
     page: &StructuredPage,
     classify: &ClassifyOutcome,
     cfg: &PdfConfig,
+    mode: OcrMode,
 ) -> PageDiagnosis {
     let live = || page.regions.iter().filter(|r| !r.text.trim().is_empty());
     let text = live()
@@ -72,7 +74,15 @@ fn page_diagnosis(
             ClassifyOutcome::Facts(f) => Some(f),
             ClassifyOutcome::Failed(_) => None,
         };
-        page_signals(doc, p, page, facts, d.bigrams.as_deref(), nc)
+        let nc = if mode == OcrMode::Auto {
+            *nc
+        } else {
+            NeedOcrConfig {
+                render_min_image_cover: 0.0,
+                ..*nc
+            }
+        };
+        page_signals(doc, p, page, facts, d.bigrams.as_deref(), &nc)
     });
     diagnose_page(
         classify,
@@ -101,17 +111,22 @@ fn page_pictures(
     };
     let wanted = ocr_needs(&[diag.decision], &cfg.diagnostics)[0];
     let cover = f.image_area_ratio.min(1.0);
-    // cheap test first: most pages have no images
-    if cover <= 0.0 {
+    // cheap tests first: most pages have no images; the engine's scans are scans
+    if cover <= 0.0 || f.kind == FactKind::Scanned {
         return None;
     }
+    let scan_cover = cfg
+        .diagnostics
+        .need_ocr
+        .as_ref()
+        .map_or(pictures::SCAN_COVER, |c| c.scan_cover);
     let nonws = page
         .regions
         .iter()
         .filter(|r| r.kind != RegionRole::Artifact)
         .map(|r| non_ws_chars(&r.text))
         .sum();
-    if !pictures::takes_pictures(wanted, cover, nonws) {
+    if !pictures::takes_pictures(wanted, cover, nonws, scan_cover) {
         return None;
     }
     let mut pics = pictures::collect(doc, p)?;
@@ -196,7 +211,7 @@ pub(super) fn stage_a(
     drop(facts);
     let t2 = Instant::now();
     let mut diag = telemetry::stage(Stage::Diagnose, || match &structured {
-        Ok(page) => page_diagnosis(doc, p, page, &classify, cfg),
+        Ok(page) => page_diagnosis(doc, p, page, &classify, cfg, opts.ocr),
         Err(e) => extraction_failed(e),
     });
     let t3 = Instant::now();

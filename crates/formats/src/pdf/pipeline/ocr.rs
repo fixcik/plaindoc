@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use pdf_oxide::PdfDocument;
 use plaindoc_core::telemetry;
 use plaindoc_core::{
-    HiddenText, Level, ParseError, ParseOptions, Result, Section, Stage, WarningKind,
+    Block, HiddenText, Level, ParseError, ParseOptions, Result, Section, Stage, WarningKind,
 };
 use rayon::prelude::*;
 
@@ -132,7 +132,16 @@ pub(super) fn apply_ocr(
                         .any(|w| w.kind == WarningKind::LowOcrConfidence)
             });
             if let Some(m) = swap {
+                // the pictures are painted, not part of the layer: they stay
+                let pictures: Vec<Block> = section
+                    .blocks
+                    .drain(..)
+                    .filter(|b| matches!(b, Block::Image { .. }))
+                    .collect();
                 section.blocks = m.blocks.clone();
+                for b in pictures {
+                    place_by_top(&mut section.blocks, b);
+                }
                 section.source = TextSource::Ocr;
                 section.quality = *quality;
                 section
@@ -186,4 +195,48 @@ pub(super) fn apply_ocr(
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pdf::ocr_stage::LayerMismatch;
+    use plaindoc_core::{BBox, SectionKind};
+
+    #[test]
+    fn a_swapped_layer_keeps_the_pictures() {
+        let done = PageOcr::Done {
+            blocks: Vec::new(),
+            warnings: Vec::new(),
+            quality: 0.9,
+            replace: false,
+            mismatch: Some(LayerMismatch {
+                check: crate::pdf::hidden_ocr::Unread {
+                    unread: 30,
+                    counted: 40,
+                    exhausted: false,
+                },
+                blocks: vec![Block::paragraph(
+                    "what the scan shows",
+                    Some(BBox::new(0.0, 700.0, 300.0, 20.0)),
+                )],
+            }),
+        };
+        let mut s = Section::new(SectionKind::Page, 0);
+        s.blocks = vec![
+            Block::paragraph("hidden layer", Some(BBox::new(0.0, 700.0, 300.0, 20.0))),
+            Block::image(None, None, Some(BBox::new(0.0, 300.0, 300.0, 200.0))),
+        ];
+        let ocr = (done, PageDecision::UseTextLayer);
+        assert!(apply_ocr(
+            &mut s,
+            Some(&ocr),
+            HiddenText::Strip,
+            &mut Vec::new()
+        ));
+        assert!(
+            matches!(&s.blocks[0], Block::Paragraph { text, .. } if text == "what the scan shows")
+        );
+        assert!(matches!(s.blocks.last(), Some(Block::Image { .. })));
+    }
 }

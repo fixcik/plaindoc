@@ -29,7 +29,7 @@ use super::ocr_stage::{OcrPageCounts, PageOcr};
 use super::open::OpenedPdf;
 use super::order::order_blocks;
 use super::outline::Outline;
-use super::pictures::{decode_pass, place, running_repeats};
+use super::pictures::{decode_pass, nothing_kept, place, restore_ocr, running_repeats};
 use super::running::{mark_running, move_out};
 use super::table_place::{place_tables, strip_table_text};
 use super::tables::{DetectedTable, TableInputCounts, continues};
@@ -240,13 +240,29 @@ pub(crate) fn parse_opened(
     {
         let pages: Vec<_> = raw.iter().map(|r| r.pictures.as_ref()).collect();
         let parallel = ctx.page_parallel_allowed && opts.page_parallel;
+        let max = opts.images.max_count;
         let (d, t) = timed(Stage::Images, || {
-            decode_pass(doc, &pages, &repeats, parallel)
+            decode_pass(doc, &pages, &repeats, max, parallel, cancel)
         });
-        (Some(d), t)
+        (
+            Some(d.map_err(|()| ParseError::Timeout(Duration::ZERO))?),
+            t,
+        )
     } else {
         (None, Duration::ZERO)
     };
+    // A page whose skipped images all turned out to be furniture goes back to its merge OCR.
+    for r in &mut raw {
+        if let Some(pg) = &mut r.pictures
+            && nothing_kept(pg, &repeats, decoded.as_ref())
+        {
+            restore_ocr(&mut r.diag, pg);
+            #[cfg(feature = "ocr")]
+            {
+                r.ocr_want = Some(PageDecision::RunOcrAndMerge);
+            }
+        }
+    }
     // OCR pass in the same job; small documents too (each OCR page is heavy).
     #[cfg(feature = "ocr")]
     let pass = ocr_pass(

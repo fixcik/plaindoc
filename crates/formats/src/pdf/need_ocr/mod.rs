@@ -99,6 +99,7 @@ pub struct NeedOcrConfig {
     /// icon does not render every page (on a Chromium brochure the 50-dpi render of eight pages
     /// was a third of the parse, all for a header logo of 0.6 %). 0.01 is a square of about
     /// 70 pt (2.5 cm) on A4: little room for the `g_abs` glyph-like components of text in an image.
+    /// The pipeline applies it under `OcrMode::Auto` only (0 in the other modes).
     pub render_min_image_cover: f32,
 }
 

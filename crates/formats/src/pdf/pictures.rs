@@ -19,6 +19,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pdf_oxide::extractors::PdfImage;
 use pdf_oxide::{PdfDocument, PdfFilter, PdfImageHandle};
@@ -26,7 +27,7 @@ use plaindoc_core::{BBox, Block, ImageInfo, Level, Warning, WarningKind};
 use rayon::prelude::*;
 
 use super::diagnose::{PageDecision, PageDiagnosis};
-use super::table_place::place_by_top;
+use super::table_place::{block_bbox, place_by_top};
 
 /// Image cover of a page (summed image area over the page area, `classify_page`) from which the
 /// page is a scan whatever its text layer: the need-OCR classifier's `scan_cover`. Such a page
@@ -64,14 +65,20 @@ pub(crate) const REPEAT_MIN_PAGES: usize = 3;
 /// within this many levels (of 255) is a fill or a faint gradient, left out as decoration.
 pub(crate) const PLATE_RANGE: u8 = 32;
 
-/// Images larger than this many pixels are not decoded (`skipped: too_large`).
-const MAX_DECODE_PX: u64 = 64 << 20;
+/// Images larger than this many pixels are not decoded (`skipped: too_large`): about 130 MB of
+/// RGBA per decode at most. A soft mask is decoded at its own size, not checked (a limit).
+const MAX_DECODE_PX: u64 = 32 << 20;
 
 /// One image painted on a page (stage A, not decoded).
 #[derive(Clone, Debug)]
 pub(crate) struct Candidate {
-    /// Hash of the stored stream bytes and size: the same raster gives the same key.
+    /// Hash of the stored stream bytes and size: the same raster gives the same key (running
+    /// repeats).
     pub key: u64,
+    /// `key` plus what decoding reads besides the bytes (colour space, bits per component): the
+    /// decode cache key. Two objects with the same bytes but different soft masks still share it
+    /// (a limit: the mask is not read before decoding).
+    pub decode_key: u64,
     /// Index among the images painted on the page (`PdfImageHandle::paint_order`).
     pub paint_order: usize,
     /// Displayed box in PDF user space (y up), clipped to the page.
@@ -89,6 +96,9 @@ pub(crate) struct PagePictures {
     pub cands: Vec<Candidate>,
     /// Images not sent to OCR by the policy (the page's `cands` when its OCR was skipped).
     pub ocr_skipped: usize,
+    /// The policy lowered the page's `ImageTextPage` hint from `Warn` (restored by
+    /// [`restore_ocr`]).
+    pub lowered: bool,
 }
 
 /// Page with a dominant image and almost no text: a scan with service text (page number, header).
@@ -99,22 +109,47 @@ pub(crate) fn service_scan(cover: f32, nonws: usize) -> bool {
 /// Whether the page gives pictures: it keeps its text layer (`UseTextLayer`, or `RunOcrAndMerge`
 /// that merges OCR into the layer), has images, and is not a scan ([`SCAN_COVER`]; a merge page
 /// that is a [`service_scan`] stays a scan under OCR).
-pub(crate) fn takes_pictures(decision: PageDecision, cover: f32, nonws: usize) -> bool {
+/// `scan_cover` is the classifier's (`NeedOcrConfig::scan_cover`, [`SCAN_COVER`] without it).
+pub(crate) fn takes_pictures(
+    decision: PageDecision,
+    cover: f32,
+    nonws: usize,
+    scan_cover: f32,
+) -> bool {
     match decision {
-        PageDecision::UseTextLayer => cover > 0.0 && cover < SCAN_COVER,
+        PageDecision::UseTextLayer => cover > 0.0 && cover < scan_cover,
         PageDecision::RunOcrAndMerge => {
-            cover > 0.0 && cover < SCAN_COVER && !service_scan(cover, nonws)
+            cover > 0.0 && cover < scan_cover && !service_scan(cover, nonws)
         }
         PageDecision::RunOcr | PageDecision::Reject => false,
     }
 }
 
-/// Lists the images of page `p` (no decoding). `None` when the page's images cannot be read.
+/// Lists the images of page `p` (no decoding). `None` when the page's images cannot be read (a
+/// panic of the reader included). Boxes are clipped to the visible page, CropBox ∩ MediaBox.
 pub(crate) fn collect(doc: &PdfDocument, p: usize) -> Option<PagePictures> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| collect_page(doc, p)))
+        .ok()
+        .flatten()
+}
+
+fn collect_page(doc: &PdfDocument, p: usize) -> Option<PagePictures> {
     let info = doc.get_page_info(p).ok()?;
     let handles = doc.page_image_handles(p).ok()?;
     let m = info.media_box;
-    let page = [m.x, m.y, m.x + m.width, m.y + m.height];
+    let mut page = [m.x, m.y, m.x + m.width, m.y + m.height];
+    // as the renderer: CropBox ∩ MediaBox, the MediaBox when they are disjoint
+    if let Some(c) = info.crop_box {
+        let r = [
+            c.x.max(page[0]),
+            c.y.max(page[1]),
+            (c.x + c.width).min(page[2]),
+            (c.y + c.height).min(page[3]),
+        ];
+        if r[2] > r[0] && r[3] > r[1] {
+            page = r;
+        }
+    }
     let sideways = info.rotation.rem_euclid(180) == 90;
     let mut out = PagePictures::default();
     for h in &handles {
@@ -135,6 +170,9 @@ pub(crate) fn collect(doc: &PdfDocument, p: usize) -> Option<PagePictures> {
         };
         let mut hs = DefaultHasher::new();
         (h.width, h.height, &raw).hash(&mut hs);
+        let key = hs.finish();
+        let mut ds = DefaultHasher::new();
+        (key, format!("{:?}", h.color_space), h.bits_per_component).hash(&mut ds);
         // the band runs along the page's visual top and bottom
         let (c, lo, hi) = if sideways {
             ((r[0] + r[2]) / 2.0, page[0], page[2])
@@ -143,7 +181,8 @@ pub(crate) fn collect(doc: &PdfDocument, p: usize) -> Option<PagePictures> {
         };
         let band = (hi - lo) * MARGIN_BAND;
         out.cands.push(Candidate {
-            key: hs.finish(),
+            key,
+            decode_key: ds.finish(),
             paint_order: h.paint_order,
             bbox: BBox::new(r[0], r[1], w, h_pt),
             band: c < lo + band || c > hi - band,
@@ -172,9 +211,40 @@ pub(crate) fn skip_image_ocr(
     for w in &mut diag.warnings {
         if w.kind == WarningKind::ImageTextPage && w.level == Level::Warn {
             w.level = Level::Info;
+            pics.lowered = true;
         }
     }
     pics.ocr_skipped = n;
+}
+
+/// Whether a page whose image OCR was skipped ends up without a single picture (every image a
+/// running repeat, decoration, a plate or undecodable): then nothing stands for its images and
+/// the page goes back to the merge OCR. Without `decoded` (pictures off) only repeats and
+/// decoration count.
+pub(crate) fn nothing_kept(
+    pg: &PagePictures,
+    repeats: &HashSet<u64>,
+    decoded: Option<&HashMap<u64, Pic>>,
+) -> bool {
+    pg.ocr_skipped > 0
+        && pg.cands.iter().all(|c| {
+            dropped(c, repeats)
+                || decoded.is_some_and(|d| !matches!(d.get(&c.decode_key), Some(Pic::Data(_))))
+        })
+}
+
+/// Undoes [`skip_image_ocr`] on `diag` (see [`nothing_kept`]).
+pub(crate) fn restore_ocr(diag: &mut PageDiagnosis, pg: &mut PagePictures) {
+    diag.decision = PageDecision::RunOcrAndMerge;
+    if pg.lowered {
+        for w in &mut diag.warnings {
+            if w.kind == WarningKind::ImageTextPage && w.level == Level::Info {
+                w.level = Level::Warn;
+            }
+        }
+    }
+    pg.ocr_skipped = 0;
+    pg.lowered = false;
 }
 
 /// Keys of the running repeats among `pages`: rasters in the margin band on at least
@@ -215,40 +285,72 @@ fn dropped(c: &Candidate, repeats: &HashSet<u64>) -> bool {
     c.small || (c.band && repeats.contains(&c.key))
 }
 
-/// Decodes every raster that stays a picture, once per key, on the pool's threads when
-/// `parallel`. `pages[p]` are the pictures of page `p`.
+/// Decodes every raster that stays a picture, once per decode key, at most `max_count` of them
+/// (the rest `max_images`), page by page (one enumeration of a page's images) on the pool's
+/// threads when `parallel`. `pages[p]` are the pictures of page `p`. `Err` when `cancel` is set.
 pub(crate) fn decode_pass(
     doc: &PdfDocument,
     pages: &[Option<&PagePictures>],
     repeats: &HashSet<u64>,
+    max_count: usize,
     parallel: bool,
-) -> HashMap<u64, Pic> {
+    cancel: &AtomicBool,
+) -> Result<HashMap<u64, Pic>, ()> {
     let mut seen = HashSet::new();
-    let mut todo: Vec<(usize, usize, u64)> = Vec::new();
+    let mut over = Vec::new();
+    let mut todo: Vec<(usize, Vec<(usize, u64)>)> = Vec::new();
     for (p, pg) in pages.iter().enumerate() {
+        let mut here = Vec::new();
         for c in pg.iter().flat_map(|g| &g.cands) {
-            if !dropped(c, repeats) && seen.insert(c.key) {
-                todo.push((p, c.paint_order, c.key));
+            if dropped(c, repeats) || !seen.insert(c.decode_key) {
+                continue;
+            }
+            if seen.len() > max_count {
+                over.push(c.decode_key);
+            } else {
+                here.push((c.paint_order, c.decode_key));
             }
         }
+        if !here.is_empty() {
+            todo.push((p, here));
+        }
     }
-    let run = |&(p, order, key): &(usize, usize, u64)| (key, decode_one(doc, p, order));
-    if parallel && todo.len() > 1 {
-        todo.par_iter().map(run).collect()
+    let run = |(p, want): &(usize, Vec<(usize, u64)>)| {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(());
+        }
+        Ok(decode_page(doc, *p, want))
+    };
+    let done: Vec<Vec<(u64, Pic)>> = if parallel && todo.len() > 1 {
+        todo.par_iter().map(run).collect::<Result<_, _>>()?
     } else {
-        todo.iter().map(run).collect()
+        todo.iter().map(run).collect::<Result<_, _>>()?
+    };
+    let mut out: HashMap<u64, Pic> = done.into_iter().flatten().collect();
+    out.extend(over.into_iter().map(|k| (k, Pic::Skipped("max_images"))));
+    // the images of the decoded pages are not read again
+    for (p, _) in &todo {
+        doc.forget_page(*p);
     }
+    Ok(out)
 }
 
-/// Decodes the image painted `order`-th on page `p`; decoder panics on hostile data become
-/// `bad_data`.
-fn decode_one(doc: &PdfDocument, p: usize, order: usize) -> Pic {
-    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let hs = doc.page_image_handles(p).ok()?;
-        let h = hs.iter().find(|h| h.paint_order == order)?;
-        Some(encode(h))
-    }));
-    r.ok().flatten().unwrap_or(Pic::Skipped("bad_data"))
+/// Decodes the images painted `order`-th on page `p` (`want`: order and decode key); decoder
+/// panics on hostile data become `bad_data`.
+fn decode_page(doc: &PdfDocument, p: usize, want: &[(usize, u64)]) -> Vec<(u64, Pic)> {
+    let hs = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| doc.page_image_handles(p)))
+        .ok()
+        .and_then(|r| r.ok())
+        .unwrap_or_default();
+    want.iter()
+        .map(|&(order, key)| {
+            let pic = hs.iter().find(|h| h.paint_order == order).map(|h| {
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| encode(h)))
+                    .unwrap_or(Pic::Skipped("bad_data"))
+            });
+            (key, pic.unwrap_or(Pic::Skipped("bad_data")))
+        })
+        .collect()
 }
 
 fn encode(h: &PdfImageHandle<'_>) -> Pic {
@@ -337,6 +439,23 @@ fn png(img: &image::DynamicImage) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// `place_by_top`, and when no block overlaps the picture horizontally (a figure in a side
+/// margin) before the first block whose top is not above the picture's, by height alone.
+fn place_picture(blocks: &mut Vec<Block>, b: Block, at: &BBox) {
+    let top = at.y + at.h;
+    let overlaps = blocks
+        .iter()
+        .any(|o| block_bbox(o).is_some_and(|bb| bb.x < at.x + at.w && at.x < bb.x + bb.w));
+    if overlaps {
+        place_by_top(blocks, b);
+        return;
+    }
+    let i = blocks
+        .iter()
+        .position(|o| block_bbox(o).is_some_and(|bb| bb.y + bb.h <= top + 1.0));
+    blocks.insert(i.unwrap_or(blocks.len()), b);
+}
+
 /// What [`place`] did on one page.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Placed {
@@ -362,7 +481,7 @@ pub(crate) fn place(
             n.dropped += 1;
             continue;
         }
-        let info = match decoded.map(|d| d.get(&c.key)) {
+        let info = match decoded.map(|d| d.get(&c.decode_key)) {
             None => None,
             Some(Some(Pic::Data(b))) => Some(ImageInfo::embedded(Arc::clone(b), None)),
             Some(Some(Pic::Plate)) => {
@@ -376,7 +495,7 @@ pub(crate) fn place(
         if let Block::Image { image, .. } = &mut b {
             *image = info.map(Box::new);
         }
-        place_by_top(blocks, b);
+        place_picture(blocks, b, &c.bbox);
         n.linked += 1;
     }
     if pg.ocr_skipped > 0 {

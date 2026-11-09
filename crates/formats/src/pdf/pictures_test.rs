@@ -12,29 +12,26 @@ fn service_scan_bounds() {
 #[test]
 fn which_pages_take_pictures() {
     use PageDecision::*;
+    let t = |d, c, n| takes_pictures(d, c, n, SCAN_COVER);
+    assert!(t(UseTextLayer, 0.5, 0), "text page: no text-volume rule");
+    assert!(t(UseTextLayer, SCAN_COVER - 0.001, 0));
+    assert!(!t(UseTextLayer, SCAN_COVER, 5000), "scan or background");
+    assert!(!t(UseTextLayer, 0.0, 5000), "no images");
+    assert!(t(RunOcrAndMerge, 0.34, 320), "brochure page 1");
+    assert!(!t(RunOcrAndMerge, 0.7, 100), "scan with service text");
+    assert!(t(RunOcrAndMerge, 0.7, SERVICE_TEXT));
+    assert!(!t(RunOcr, 0.3, 500));
+    assert!(!t(Reject, 0.3, 500));
     assert!(
-        takes_pictures(UseTextLayer, 0.5, 0),
-        "text page: no text-volume rule"
+        !takes_pictures(UseTextLayer, 0.6, 0, 0.6),
+        "the classifier's scan cover"
     );
-    assert!(takes_pictures(UseTextLayer, SCAN_COVER - 0.001, 0));
-    assert!(
-        !takes_pictures(UseTextLayer, SCAN_COVER, 5000),
-        "scan or background"
-    );
-    assert!(!takes_pictures(UseTextLayer, 0.0, 5000), "no images");
-    assert!(takes_pictures(RunOcrAndMerge, 0.34, 320), "brochure page 1");
-    assert!(
-        !takes_pictures(RunOcrAndMerge, 0.7, 100),
-        "scan with service text"
-    );
-    assert!(takes_pictures(RunOcrAndMerge, 0.7, SERVICE_TEXT));
-    assert!(!takes_pictures(RunOcr, 0.3, 500));
-    assert!(!takes_pictures(Reject, 0.3, 500));
 }
 
 fn cand(key: u64, band: bool, small: bool) -> Candidate {
     Candidate {
         key,
+        decode_key: key,
         paint_order: 0,
         bbox: BBox::new(0.0, 0.0, 100.0, 100.0),
         band,
@@ -46,6 +43,7 @@ fn page(c: Vec<Candidate>) -> PagePictures {
     PagePictures {
         cands: c,
         ocr_skipped: 0,
+        lowered: false,
     }
 }
 

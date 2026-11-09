@@ -55,7 +55,8 @@ pages (a running header or footer logo; documents of fewer pages keep it), image
 16 px on a side (rules, bullets, icons) and plates (every channel within 32 levels of 255: a fill
 or a faint gradient; not checked on JPEGs, which are not decoded). Scans give no pictures: pages
 that go to full-page OCR, pages whose images cover 80 % or more, and "scans with service text"
-(images over 60 % of the page with a layer under 200 non-space chars), which keep their OCR.
+(images over 60 % of the page with a layer under 200 non-space chars), which keep their OCR;
+so do pages the engine classifies as scanned. Boxes are clipped to the visible page (CropBox).
 
 OCR of images on such pages (`--ocr`, `ParseOptions::ocr`):
 
@@ -63,6 +64,9 @@ OCR of images on such pages (`--ocr`, `ParseOptions::ocr`):
   classifier would have OCRed them (text-like ink outside the layer), the page gets an
   `ImageTextPage`/`info` warning `N image(s) not recognised: OCR is skipped on a page with a text
   layer (K kept as pictures)` and the classifier's own `ImageTextPage` hint is `info`, not `warn`.
+  A page whose images all turn out to be furniture (running repeats, small, plates, undecodable)
+  keeps its OCR. A text page whose images cover at most 1 % of it is not rendered for the
+  classifier (`NeedOcrConfig::render_min_image_cover`), so a small logo never triggers OCR.
 - `images`: as `auto`, plus the OCR of those images merged into the page (the `auto` of earlier
   versions), with the pictures linked too.
 - `always`: OCR of every page, merged with the layer; pictures linked. `never`: no OCR.

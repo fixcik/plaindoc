@@ -518,3 +518,45 @@ fn text_page_without_images_is_untouched() {
     assert_eq!(s.images, Default::default());
     assert!(!s.stages_us.contains_key(&plaindoc_core::Stage::Images));
 }
+
+#[test]
+fn a_page_whose_images_are_all_furniture_keeps_its_ocr() {
+    // a dotted (text-like) logo in the top band of 3 text pages: the classifier wants its OCR,
+    // the policy would skip it, but the logo is a running repeat, so the merge OCR stays
+    let pages: Vec<Page> = (0..3)
+        .map(|_| Page {
+            lines: prose(300, 600.0),
+            images: vec![(0, 72.0, 680.0, 400.0, 100.0)],
+        })
+        .collect();
+    let (d, s, calls) = parse(pdf(&[dots(240, 60)], &pages), OcrMode::Auto);
+    assert!(calls > 0, "{:?}", d.sections[0].warnings);
+    for i in 0..3 {
+        assert!(pictures(&d, i).is_empty());
+        assert_eq!(skipped_warning(&d, i), None);
+        assert_eq!(d.sections[i].source, TextSource::Mixed);
+    }
+    assert_eq!((s.images.ocr_skipped, s.images.dropped), (0, 3));
+}
+
+#[test]
+fn a_picture_beside_the_text_goes_by_its_height() {
+    // text in a narrow left column, the picture in the right margin between the two paragraphs
+    let mut lines: Vec<_> = prose(200, 740.0);
+    lines.extend(prose(200, 300.0));
+    let lines = lines
+        .into_iter()
+        .map(|(x, y, t)| (x, y, t.chars().take(40).collect()))
+        .collect();
+    let pg = Page {
+        lines,
+        images: vec![(0, 400.0, 450.0, 150.0, 150.0)],
+    };
+    let (d, _, _) = parse(pdf(&[photo(60, 60, 4)], &[pg]), OcrMode::Auto);
+    let b = &d.sections[0].blocks;
+    let pos = b
+        .iter()
+        .position(|b| matches!(b, Block::Image { .. }))
+        .unwrap();
+    assert!(pos > 0 && pos + 1 < b.len(), "{b:?}");
+}
