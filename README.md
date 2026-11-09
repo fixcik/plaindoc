@@ -6,8 +6,8 @@ A fast document parser for LLM agents: turns office files, PDFs and scans into M
 
 - **Formats:** PDF with a text layer and scanned PDF (OCR), doc/docx, xls/xlsx, ppt/pptx, odt/ods, rtf, csv/tsv, txt, md, html/xml, images.
 - **Output:** Markdown or JSON (plaindoc's own schema, not DoclingDocument).
-- **Structure:** links, headings, lists, tables, running headers and footers, hidden-text removal.
-- **OCR:** PP-OCRv5 models (about 13 MB) embedded in the binary.
+- **Structure:** links, headings, lists, tables, pictures (files next to the output), running headers and footers, hidden-text removal.
+- **OCR:** PP-OCRv5 models (about 13 MB) embedded in the binary. Images on PDF pages with a text layer are not recognised by default: they are written out as picture files and linked (`--ocr images` recognises them too).
 - One Rust binary, no Python and no heavy machine-learning frameworks.
 
 ## Install

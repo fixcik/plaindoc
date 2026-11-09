@@ -39,6 +39,38 @@ A block is an object with a `type` tag; every variant has `bbox` (`{x, y, w, h}`
 `links` is omitted when empty. A link is `{start, end, url}`: char offsets (Unicode scalar values, not
 bytes) into `text`, sorted and non-overlapping; `url` is absolute `http`, `https` or `mailto`.
 
+## Pictures of PDF pages
+
+A PDF page that keeps its text layer gives its raster images as `image` blocks (no `alt`, no
+`ocr_text`; `bbox` is the displayed box clipped to the page), placed among the page's blocks by
+their top edge. They are stored like office pictures: one `imageN.png` per distinct picture
+(a plain JPEG goes out as stored, `imageN.jpg`; an image with a soft mask is a PNG with alpha), in
+`img-<id>/` next to the output with `-o`, linked as `![изображение N](img-<id>/imageN.png)`.
+`--no-images` leaves bare `<!-- image -->` marks. Without `-o` (output on stdout) pictures of any
+format are only named, and stderr gets one line per document with pictures: `note: FILE: N
+picture(s) not saved: pass -o DIR to write them as files` (not with `--no-warnings`).
+
+Left out as page furniture: the same raster in the top or bottom 15 % of the page on at least 3
+pages (a running header or footer logo; documents of fewer pages keep it), images under 32 pt or
+16 px on a side (rules, bullets, icons) and plates (every channel within 32 levels of 255: a fill
+or a faint gradient; not checked on JPEGs, which are not decoded). Scans give no pictures: pages
+that go to full-page OCR, pages whose images cover 80 % or more, and "scans with service text"
+(images over 60 % of the page with a layer under 200 non-space chars), which keep their OCR.
+
+OCR of images on such pages (`--ocr`, `ParseOptions::ocr`):
+
+- `auto` (default): images on a page with a text layer are not recognised. Where the need-OCR
+  classifier would have OCRed them (text-like ink outside the layer), the page gets an
+  `ImageTextPage`/`info` warning `N image(s) not recognised: OCR is skipped on a page with a text
+  layer (K kept as pictures)` and the classifier's own `ImageTextPage` hint is `info`, not `warn`.
+- `images`: as `auto`, plus the OCR of those images merged into the page (the `auto` of earlier
+  versions), with the pictures linked too.
+- `always`: OCR of every page, merged with the layer; pictures linked. `never`: no OCR.
+
+`--stats` counts them in `images`: `linked` (picture blocks with a stored file, every occurrence;
+all formats), `ocr_skipped` (PDF images not sent to OCR under `auto`) and `dropped` (PDF page
+furniture left out); decoding time is the `images` stage.
+
 ## Cell
 
 `blocks` (content in order: text, nested table, text), `colspan`, `rowspan`, `value`. Rows hold only
