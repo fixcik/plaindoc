@@ -216,11 +216,16 @@ impl SkewScore {
         // Sub-pixel shift: without it a = 0 (no interpolation blur) always wins. The research's 0.5 px
         // over-corrects (every row splits 50/50 at a = 0 only, so small angles win: 0.2° on a level
         // page); a quarter pixel blurs a = 0 about as much as the phases a tilted row sweeps.
-        warp(ww, hh, a, SKEW_SHIFT_PX, taps, |j, taps| {
-            let v: f32 = taps
-                .iter()
-                .map(|&(s, wt)| s.map_or(0.0, |s| ink[s]) * wt)
-                .sum();
+        warp_at(ww, hh, a, SKEW_SHIFT_PX, |j, x, y| {
+            // All 4 taps inside: the same products and summation order as `taps`.
+            let v: f32 = if let Some(t) = bilinear_inside(x, y, ww, hh) {
+                t.iter().map(|&(s, wt)| ink[s] * wt).sum()
+            } else {
+                taps(x, y, ww, hh)
+                    .iter()
+                    .map(|&(s, wt)| s.map_or(0.0, |s| ink[s]) * wt)
+                    .sum()
+            };
             prof[strip[j % ww] * hh + j / ww] += f64::from(v);
         });
         prof.chunks_exact(hh)
@@ -260,6 +265,23 @@ fn warp_at(w: usize, h: usize, deg: f32, shift: f64, mut f: impl FnMut(usize, f6
             sy += s;
         }
     }
+}
+
+/// The taps of [`taps`] at `(x, y)` when all 4 lie inside the image (same indices and weights).
+fn bilinear_inside(x: f64, y: f64, w: usize, h: usize) -> Option<[(usize, f32); 4]> {
+    let (x0, y0) = (x.floor(), y.floor());
+    // NaN fails every comparison; infinities fail the upper bounds.
+    let inside = x0 >= 0.0 && y0 >= 0.0 && x0 + 1.0 < w as f64 && y0 + 1.0 < h as f64;
+    inside.then(|| {
+        let (fx, fy) = ((x - x0) as f32, (y - y0) as f32);
+        let k = y0 as usize * w + x0 as usize;
+        [
+            (k, (1.0 - fx) * (1.0 - fy)),
+            (k + 1, fx * (1.0 - fy)),
+            (k + w, (1.0 - fx) * fy),
+            (k + w + 1, fx * fy),
+        ]
+    })
 }
 
 /// When all 4×4 taps of [`cubic_taps`] at `(x, y)` lie inside the image: the index of the top-left

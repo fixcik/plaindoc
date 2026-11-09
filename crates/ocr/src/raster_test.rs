@@ -238,3 +238,97 @@ fn rotate_fast_path_matches_the_taps() {
         );
     }
 }
+
+/// `SkewScore::score` with every sample through `taps` (before the inside-the-image fast path).
+fn score_by_taps(s: &SkewScore, step: i32) -> f64 {
+    let a = step as f32 * SKEW_STEP_DEG;
+    let (ww, hh) = (s.ww, s.hh);
+    let mut prof = vec![0f64; 3 * hh];
+    warp(ww, hh, a, SKEW_SHIFT_PX, taps, |j, taps| {
+        let v: f32 = taps
+            .iter()
+            .map(|&(t, wt)| t.map_or(0.0, |t| s.ink[t]) * wt)
+            .sum();
+        prof[s.strip[j % ww] * hh + j / ww] += f64::from(v);
+    });
+    prof.chunks_exact(hh)
+        .map(|p| p.windows(2).map(|d| (d[1] - d[0]).powi(2)).sum::<f64>())
+        .sum()
+}
+
+#[test]
+fn skew_score_fast_path_matches_the_taps() {
+    for a in [-2.3, 0.0, 1.7] {
+        let mut s = SkewScore::new(&gray(&lines_page(a))).unwrap();
+        for step in -SKEW_STEPS..=SKEW_STEPS {
+            let want = score_by_taps(&s, step);
+            assert_eq!(s.score(step).to_bits(), want.to_bits(), "{a} {step}");
+        }
+    }
+}
+
+/// Coordinates around the borders of a `w`×`h` image plus non-finite and huge ones.
+fn probe_points(w: usize, h: usize) -> Vec<(f64, f64)> {
+    let near = |n: usize| {
+        let mut v = vec![
+            -0.0,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            1e300,
+            -1e300,
+        ];
+        for b in [
+            -2.0,
+            -1.0,
+            0.0,
+            1.0,
+            2.0,
+            n as f64 - 3.0,
+            n as f64 - 2.0,
+            n as f64 - 1.0,
+            n as f64,
+        ] {
+            v.extend([b, b + 0.5, b + 1.0 - 1e-9, b - 1e-9]);
+        }
+        v
+    };
+    let (xs, ys) = (near(w), near(h));
+    xs.iter()
+        .flat_map(|&x| ys.iter().map(move |&y| (x, y)))
+        .collect()
+}
+
+#[test]
+fn inside_taps_match_the_general_taps() {
+    for (w, h) in [(1, 1), (2, 3), (4, 4), (5, 7), (9, 6)] {
+        for (x, y) in probe_points(w, h) {
+            let all = cubic_taps(x, y, w, h);
+            match cubic_inside(x, y, w, h) {
+                Some((first, wx, wy)) => {
+                    for j in 0..4 {
+                        for i in 0..4 {
+                            let (s, wt) = all[4 * j + i];
+                            assert_eq!(s, Some(first + j * w + i), "{w}x{h} ({x}, {y})");
+                            assert_eq!((wx[i] * wy[j]).to_bits(), wt.to_bits());
+                        }
+                    }
+                }
+                None => assert!(all.iter().any(|t| t.0.is_none()), "{w}x{h} ({x}, {y})"),
+            }
+            let all = taps(x, y, w, h);
+            match bilinear_inside(x, y, w, h) {
+                Some(t) => {
+                    for (k, &(s, wt)) in t.iter().enumerate() {
+                        assert_eq!(all[k].0, Some(s), "{w}x{h} ({x}, {y})");
+                        assert_eq!(all[k].1.to_bits(), wt.to_bits());
+                    }
+                }
+                None => assert!(all.iter().any(|t| t.0.is_none()), "{w}x{h} ({x}, {y})"),
+            }
+        }
+    }
+    // the fast paths are taken inside
+    assert!(cubic_inside(4.5, 3.5, 9, 6).is_some());
+    assert!(bilinear_inside(4.5, 3.5, 9, 6).is_some());
+}
