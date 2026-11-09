@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use pdf_oxide::StructuredPage;
@@ -204,6 +204,19 @@ pub(crate) fn parse_opened(
             stage_a(doc, p, cfg, opts, layers.as_ref(), cancel)
         })
     };
+    // The fork's running header/footer scan (every page, once per document) runs inside page 0,
+    // on this thread alone; with pages in parallel it is started first on `workers` tasks of
+    // PDF_POOL, while no page task of this document is queued. Same result (the fork aggregates in
+    // page order); an error is left to page 0, which runs the scan again and fails as before. Not
+    // after a cancel: page 0 then stops before reaching the scan, as it did.
+    let scan_took = if parallel && !cancel.load(Ordering::Relaxed) {
+        timed(Stage::Text, || {
+            let _ = doc.scan_running_artifacts_on_current_pool(workers);
+        })
+        .1
+    } else {
+        Duration::ZERO
+    };
     let mut raw = Vec::with_capacity(n);
     if n > 0 {
         raw.push(page_a(0)?);
@@ -230,7 +243,7 @@ pub(crate) fn parse_opened(
     let assemble = Instant::now();
     let mut stats = ParseStats::default();
     stats.page_parallel = parallel;
-    stats.add_stage(Stage::Text, ocgs_took);
+    stats.add_stage(Stage::Text, ocgs_took + scan_took);
     let mut est = WorkEstimate::default();
     let ok_pages: Vec<&StructuredPage> = raw
         .iter()
